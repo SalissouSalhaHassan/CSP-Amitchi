@@ -11,7 +11,7 @@
         android:maxSdkVersion="32" />
 
     <application
-        android:label="EDUT PRO SCOLAIRE"
+        android:label="CSP AMITCHI PRO"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity
