@@ -25,7 +25,7 @@ class StudentsRepository {
     final cacheManager = locator<OfflineStoreManager>();
 
     if (!syncEngine.isOnlineNotifier.value) {
-      debugPrint("ًں“¶ Offline Mode: Fetching students list from local cache.");
+      debugPrint("📶 Offline Mode: Fetching students list from local cache.");
       return cacheManager.getDataList(
         boxName: OfflineStoreManager.boxStudents,
         key: _studentsCacheKey,
@@ -58,7 +58,7 @@ class StudentsRepository {
     final cacheKey = "student_detail_$studentId";
 
     if (!syncEngine.isOnlineNotifier.value) {
-      debugPrint("ًں“¶ Offline Mode: Fetching student details from local cache.");
+      debugPrint("📶 Offline Mode: Fetching student details from local cache.");
       final cached = cacheManager.getDataList(
         boxName: OfflineStoreManager.boxStudents,
         key: cacheKey,
@@ -103,7 +103,7 @@ class StudentsRepository {
     }
   }
 
-  Future<Map<String, List<String>>> getStudentFormOptions() async {
+  Future<Map<String, dynamic>> getStudentFormOptions() async {
     final syncEngine = locator<SyncEngine>();
     final cacheManager = locator<OfflineStoreManager>();
     const cacheKey = "student_form_options";
@@ -120,13 +120,17 @@ class StudentsRepository {
           'sections': List<String>.from(item['sections'] ?? []),
           'classes': List<String>.from(item['classes'] ?? []),
           'sessions': List<String>.from(item['sessions'] ?? ['2026-2027']),
+          'classesDetails': List<Map<String, dynamic>>.from(
+            (item['classesDetails'] as List? ?? []).map((x) => Map<String, dynamic>.from(x)),
+          ),
         };
       }
       return {
-        'levels': ['Primaire', 'Collège', 'Lycée'],
-        'sections': ['Primaire Général', 'Section A'],
-        'classes': ['CE1 A', '6ème A'],
+        'levels': ['Collège', 'Lycée', 'Primaire'],
+        'sections': ['Générale'],
+        'classes': ['6ème A', '5ème A', '4ème A', '3ème A', '2nde A', '1ère A', 'Tle A'],
         'sessions': ['2026-2027'],
+        'classesDetails': <Map<String, dynamic>>[],
       };
     }
 
@@ -139,6 +143,9 @@ class StudentsRepository {
       final sections = List<String>.from(response['sections'] ?? []);
       final classes = List<String>.from(response['classes'] ?? []);
       final sessions = List<String>.from(response['sessions'] ?? ['2026-2027']);
+      final classesDetails = List<Map<String, dynamic>>.from(
+        (response['classesDetails'] as List? ?? []).map((x) => Map<String, dynamic>.from(x)),
+      );
 
       await cacheManager.saveDataList(
         boxName: OfflineStoreManager.boxStudents,
@@ -149,6 +156,7 @@ class StudentsRepository {
             'sections': sections,
             'classes': classes,
             'sessions': sessions,
+            'classesDetails': classesDetails,
           }
         ],
       );
@@ -157,15 +165,17 @@ class StudentsRepository {
         'levels': levels,
         'sections': sections,
         'classes': classes,
-        'sessions': sessions.isNotEmpty ? sessions : ['2026-2027'],
+        'sessions': sessions,
+        'classesDetails': classesDetails,
       };
     } catch (e) {
       debugPrint('Error fetching student form options: $e');
       return {
-        'levels': ['Primaire', 'Collège', 'Lycée'],
-        'sections': ['Primaire Général', 'Section A'],
-        'classes': ['CE1 A', '6ème A'],
+        'levels': ['Collège', 'Lycée', 'Primaire'],
+        'sections': ['Générale'],
+        'classes': ['6ème A', '5ème A', '4ème A', '3ème A', '2nde A', '1ère A', 'Tle A'],
         'sessions': ['2026-2027'],
+        'classesDetails': <Map<String, dynamic>>[],
       };
     }
   }
@@ -212,7 +222,7 @@ class StudentsRepository {
         'success': true,
         'isOffline': true,
         'localId': localTempId,
-        'message': 'أ‰lأ¨ve enregistrأ© localement en mode hors-ligne.',
+        'message': 'Élève enregistré localement en mode hors-ligne.',
       };
     }
 
@@ -242,7 +252,7 @@ class StudentsRepository {
         'success': true,
         'isOffline': true,
         'localId': localTempId,
-        'message': 'Connexion instable. أ‰lأ¨ve mis en file d\'attente de synchronisation.',
+        'message': 'Connexion instable. Élève mis en file d\'attente de synchronisation.',
       };
     }
   }

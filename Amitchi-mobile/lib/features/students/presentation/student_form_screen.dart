@@ -73,6 +73,7 @@ class _StudentFormScreenState extends State<StudentFormScreen> {
   List<String> _levels = [];
   List<String> _sections = [];
   List<String> _classes = [];
+  List<Map<String, dynamic>> _classesDetails = [];
 
   bool get _isEdit => widget.initialData?['id'] != null;
 
@@ -190,6 +191,54 @@ class _StudentFormScreenState extends State<StudentFormScreen> {
     }
   }
 
+  void _applyClassFees(String? className) {
+    if (className == null || className.isEmpty) return;
+    final cls = _classesDetails.firstWhere(
+      (c) => c['className']?.toString() == className,
+      orElse: () => <String, dynamic>{},
+    );
+
+    if (cls.isNotEmpty) {
+      final monthly = cls['scolariteMensuelle'];
+      final registration = cls['droitsInscription'];
+      final coges = cls['cogesCarteId'];
+      final transport = cls['transportInternat'];
+      final balance = cls['ancienSolde'];
+      final initialStatus = cls['statutInitial'];
+
+      final infLevel = cls['educationalLevel']?.toString();
+      final infSection = cls['sectionName']?.toString();
+
+      setState(() {
+        if (infLevel != null && infLevel.isNotEmpty && _levels.contains(infLevel)) {
+          _selectedLevel = infLevel;
+        }
+        if (infSection != null && infSection.isNotEmpty && _sections.contains(infSection)) {
+          _selectedSection = infSection;
+        }
+        if (initialStatus != null && initialStatus.toString().isNotEmpty) {
+          _selectedStatus = initialStatus.toString();
+        }
+
+        if (!_isEdit || _monthlyController.text.isEmpty || _monthlyController.text == '0') {
+          _monthlyController.text = (monthly ?? 0).toString();
+        }
+        if (!_isEdit || _registrationController.text.isEmpty || _registrationController.text == '0') {
+          _registrationController.text = (registration ?? 0).toString();
+        }
+        if (!_isEdit || _cogesCardController.text.isEmpty || _cogesCardController.text == '0') {
+          _cogesCardController.text = (coges ?? 1500).toString();
+        }
+        if (!_isEdit || _transportInternatController.text.isEmpty) {
+          _transportInternatController.text = (transport ?? 0).toString();
+        }
+        if (!_isEdit || _balanceController.text.isEmpty) {
+          _balanceController.text = (balance ?? 0).toString();
+        }
+      });
+    }
+  }
+
   Future<void> _loadOptions() async {
     try {
       try {
@@ -199,23 +248,31 @@ class _StudentFormScreenState extends State<StudentFormScreen> {
       if (!mounted) return;
       setState(() {
         _hasFormPermission = true;
-        _sessions = (options['sessions'] != null && options['sessions']!.isNotEmpty)
-            ? options['sessions']!
+        _sessions = (options['sessions'] != null && (options['sessions'] as List).isNotEmpty)
+            ? List<String>.from(options['sessions'])
             : ['2026-2027'];
-        _levels = (options['levels'] != null && options['levels']!.isNotEmpty)
-            ? options['levels']!
+        _levels = (options['levels'] != null && (options['levels'] as List).isNotEmpty)
+            ? List<String>.from(options['levels'])
             : ['Primaire', 'Collège', 'Lycée'];
-        _sections = (options['sections'] != null && options['sections']!.isNotEmpty)
-            ? options['sections']!
+        _sections = (options['sections'] != null && (options['sections'] as List).isNotEmpty)
+            ? List<String>.from(options['sections'])
             : ['Primaire Général', 'Section A'];
-        _classes = (options['classes'] != null && options['classes']!.isNotEmpty)
-            ? options['classes']!
+        _classes = (options['classes'] != null && (options['classes'] as List).isNotEmpty)
+            ? List<String>.from(options['classes'])
             : ['CE1 A', '6ème A'];
+        _classesDetails = (options['classesDetails'] != null)
+            ? List<Map<String, dynamic>>.from(options['classesDetails'])
+            : [];
 
         _selectedSession ??= _sessions.first;
         _selectedLevel ??= _levels.first;
         _selectedSection ??= _sections.first;
         _selectedClass ??= _classes.first;
+
+        // Auto-fill financial fees if creating a new student
+        if (!_isEdit && _selectedClass != null) {
+          _applyClassFees(_selectedClass);
+        }
       });
     } catch (e) {
       debugPrint('Error loading form options: $e');
@@ -226,6 +283,7 @@ class _StudentFormScreenState extends State<StudentFormScreen> {
         _levels = ['Primaire', 'Collège', 'Lycée'];
         _sections = ['Primaire Général', 'Section A'];
         _classes = ['CE1 A', '6ème A'];
+        _classesDetails = [];
         _selectedSession ??= _sessions.first;
         _selectedLevel ??= _levels.first;
         _selectedSection ??= _sections.first;
@@ -753,7 +811,10 @@ class _StudentFormScreenState extends State<StudentFormScreen> {
                     label: 'CLASSE *',
                     value: _selectedClass,
                     items: _classes,
-                    onChanged: (v) => setState(() => _selectedClass = v),
+                    onChanged: (v) {
+                      setState(() => _selectedClass = v);
+                      _applyClassFees(v);
+                    },
                   ),
                 ),
                 const SizedBox(width: 12),
