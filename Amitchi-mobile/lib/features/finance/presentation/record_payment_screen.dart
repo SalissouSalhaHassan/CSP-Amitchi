@@ -39,10 +39,35 @@ class _RecordPaymentScreenState extends State<RecordPaymentScreen> {
   late int _feeId;
   late int _schoolId;
 
-  final List<String> _paymentModes = ['Espèces', 'Chèque', 'Virement', 'Mobile Money'];
+  final List<String> _paymentModes = [
+    'Espèces',
+    'Mobile Money',
+    'Virement',
+    'Chèque',
+    'Carte Bancaire',
+    'Paiement Électronique',
+  ];
+
   final List<String> _months = [
-    'Général', 'Inscription', 'Septembre', 'Octobre', 'Novembre', 'Décembre', 
-    'Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin'
+    'Général',
+    'Frais d\'inscription',
+    'Frais COGES & Carte ID',
+    'Frais Transport & Internat',
+    '1er Trimestre',
+    '2ème Trimestre',
+    '3ème Trimestre',
+    'Septembre',
+    'Octobre',
+    'Novembre',
+    'Décembre',
+    'Janvier',
+    'Février',
+    'Mars',
+    'Avril',
+    'Mai',
+    'Juin',
+    'Juillet',
+    'Août',
   ];
 
   @override
@@ -360,17 +385,22 @@ class _RecordPaymentScreenState extends State<RecordPaymentScreen> {
               const SizedBox(height: 20),
 
               // Dropdown: Month concerned
-              Text("Mois concerné", style: AppTextStyles.bodyBold.copyWith(fontSize: 13, color: AppColors.slate700)),
+              Text("Mois / Session concerné", style: AppTextStyles.bodyBold.copyWith(fontSize: 13, color: AppColors.slate700)),
               const SizedBox(height: 6),
               DropdownButtonFormField<String>(
                 initialValue: _monthConcerned,
+                isExpanded: true,
                 decoration: const InputDecoration(
                   prefixIcon: Icon(Icons.calendar_month, color: AppColors.primary),
                 ),
                 items: _months.map((m) {
                   return DropdownMenuItem<String>(
                     value: m,
-                    child: Text(m, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+                    child: Text(
+                      m,
+                      style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13.5),
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   );
                 }).toList(),
                 onChanged: (val) {
