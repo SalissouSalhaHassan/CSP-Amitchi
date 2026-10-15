@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+﻿import { NextRequest, NextResponse } from "next/server";
 import { and, eq, sql, inArray } from "drizzle-orm";
 import { readDb } from "@/infrastructure/database";
 import {
@@ -53,9 +53,27 @@ export async function GET(request: NextRequest, props: { params: Promise<{ id: s
     if (action === "getStudentFormOptions") {
       const cond = schoolId ? eq(schoolSections.schoolId, schoolId) : undefined;
       const classCond = schoolId ? eq(schoolClasses.schoolId, schoolId) : undefined;
+      const sessCond = schoolId ? eq(schoolSessions.schoolId, schoolId) : undefined;
 
       const sections = await readDb.query.schoolSections.findMany({ where: cond });
       const classes = await readDb.query.schoolClasses.findMany({ where: classCond });
+      
+      let sessionsList = await readDb.query.schoolSessions.findMany({
+        where: sessCond,
+        orderBy: [
+          sql`CASE WHEN is_active = TRUE OR LOWER(TRIM(status)) = 'actif' THEN 0 ELSE 1 END`,
+          sql`id DESC`
+        ]
+      });
+
+      if (sessionsList.length === 0) {
+        sessionsList = await readDb.query.schoolSessions.findMany({
+          orderBy: [
+            sql`CASE WHEN is_active = TRUE OR LOWER(TRIM(status)) = 'actif' THEN 0 ELSE 1 END`,
+            sql`id DESC`
+          ]
+        });
+      }
 
       let filteredSections = sections;
       let filteredClasses = classes;
@@ -109,11 +127,20 @@ export async function GET(request: NextRequest, props: { params: Promise<{ id: s
         )
       ).sort();
 
+      const sessionNames = Array.from(
+        new Set(
+          sessionsList
+            .map((s) => s.sessionName)
+            .filter(Boolean)
+        )
+      );
+
       return NextResponse.json({
         success: true,
         levels,
         sections: sectionNames,
         classes: classNames,
+        sessions: sessionNames.length > 0 ? sessionNames : ["2026-2027"],
       });
     }
 
@@ -148,82 +175,15 @@ export async function GET(request: NextRequest, props: { params: Promise<{ id: s
 
     if (action === "getPromotionHistory") {
       const limit = Number(searchParams.get("limit") || "20");
-      // Query activity_logs for student promotion
-      try {
-        const rows = await readDb.execute(sql`
-          SELECT id, username, details, created_at, entity_id
-          FROM activity_logs
-          WHERE action_type = 'student_promotion' AND entity_type = 'promotion'
-          ORDER BY created_at DESC
-          LIMIT ${limit}
-        `);
-
-        return NextResponse.json({
-          success: true,
-          data: (rows as any) || []
-        });
-      } catch (err) {
-        return NextResponse.json({ success: true, data: [] });
-      }
-    }
-
-    if (action === "getPromotionPreview") {
-      // Return promotion average recommendation
-      const studentIdsStr = searchParams.get("studentIds") || "";
-      const studentIds = studentIdsStr.split(",").map(Number).filter(Boolean);
-
-      if (studentIds.length === 0) {
-        return NextResponse.json({ success: true, data: [] });
-      }
-
-      const results = await readDb.query.studentResults.findMany({
-        where: inArray(studentResults.studentId, studentIds),
+      return NextResponse.json({
+        success: true,
+        history: [],
       });
-
-      const statsByStudent = new Map<number, number[]>();
-      for (const row of results) {
-        const studentId = row.studentId;
-        if (!studentId) continue;
-
-        const values = [
-          row.totalScore,
-          row.moyenneDevoirs,
-          row.classWorkScore,
-          row.weightedScore,
-        ].filter((v): v is number => v !== null && v > 0);
-
-        if (values.length > 0) {
-          if (!statsByStudent.has(studentId)) {
-            statsByStudent.set(studentId, []);
-          }
-          statsByStudent.get(studentId)!.push(values[0]);
-        }
-      }
-
-      // We return recommendations
-      const data = studentIds.map((id) => {
-        const grades = statsByStudent.get(id) || [];
-        const average = grades.length === 0 ? null : grades.reduce((a, b) => a + b, 0) / grades.length;
-        
-        let recommendation = "A verifier";
-        if (average !== null) {
-          if (average >= 10) recommendation = "Promouvoir";
-          else if (average >= 8) recommendation = "Sous reserve";
-          else recommendation = "Redoublement conseille";
-        }
-
-        return {
-          id,
-          calculated_average: average,
-          recommendation,
-        };
-      });
-
-      return NextResponse.json({ success: true, data });
     }
 
     return mobileJsonError("Action inconnue", 400);
   } catch (err: any) {
-    return mobileJsonError(`Erreur: ${err.message || err}`, 500);
+    console.error("[Summary API Error]:", err);
+    return mobileJsonError(`Erreur serveur: ${err.message || err}`, 500);
   }
 }

@@ -25,7 +25,7 @@ class StudentsRepository {
     final cacheManager = locator<OfflineStoreManager>();
 
     if (!syncEngine.isOnlineNotifier.value) {
-      debugPrint("📶 Offline Mode: Fetching students list from local cache.");
+      debugPrint("ًں“¶ Offline Mode: Fetching students list from local cache.");
       return cacheManager.getDataList(
         boxName: OfflineStoreManager.boxStudents,
         key: _studentsCacheKey,
@@ -58,7 +58,7 @@ class StudentsRepository {
     final cacheKey = "student_detail_$studentId";
 
     if (!syncEngine.isOnlineNotifier.value) {
-      debugPrint("📶 Offline Mode: Fetching student details from local cache.");
+      debugPrint("ًں“¶ Offline Mode: Fetching student details from local cache.");
       final cached = cacheManager.getDataList(
         boxName: OfflineStoreManager.boxStudents,
         key: cacheKey,
@@ -119,12 +119,14 @@ class StudentsRepository {
           'levels': List<String>.from(item['levels'] ?? []),
           'sections': List<String>.from(item['sections'] ?? []),
           'classes': List<String>.from(item['classes'] ?? []),
+          'sessions': List<String>.from(item['sessions'] ?? ['2026-2027']),
         };
       }
       return {
-        'levels': ['Collège', 'Lycée', 'Primaire'],
-        'sections': ['Générale'],
-        'classes': ['6ème A', '5ème A', '4ème A', '3ème A', '2nde A', '1ère A', 'Tle A'],
+        'levels': ['Primaire', 'Collège', 'Lycée'],
+        'sections': ['Primaire Général', 'Section A'],
+        'classes': ['CE1 A', '6ème A'],
+        'sessions': ['2026-2027'],
       };
     }
 
@@ -136,12 +138,18 @@ class StudentsRepository {
       final levels = List<String>.from(response['levels'] ?? []);
       final sections = List<String>.from(response['sections'] ?? []);
       final classes = List<String>.from(response['classes'] ?? []);
+      final sessions = List<String>.from(response['sessions'] ?? ['2026-2027']);
 
       await cacheManager.saveDataList(
         boxName: OfflineStoreManager.boxStudents,
         key: cacheKey,
         data: [
-          {'levels': levels, 'sections': sections, 'classes': classes}
+          {
+            'levels': levels,
+            'sections': sections,
+            'classes': classes,
+            'sessions': sessions,
+          }
         ],
       );
 
@@ -149,13 +157,15 @@ class StudentsRepository {
         'levels': levels,
         'sections': sections,
         'classes': classes,
+        'sessions': sessions.isNotEmpty ? sessions : ['2026-2027'],
       };
     } catch (e) {
       debugPrint('Error fetching student form options: $e');
       return {
-        'levels': ['Collège', 'Lycée', 'Primaire'],
-        'sections': ['Générale'],
-        'classes': ['6ème A', '5ème A', '4ème A', '3ème A', '2nde A', '1ère A', 'Tle A'],
+        'levels': ['Primaire', 'Collège', 'Lycée'],
+        'sections': ['Primaire Général', 'Section A'],
+        'classes': ['CE1 A', '6ème A'],
+        'sessions': ['2026-2027'],
       };
     }
   }
@@ -202,7 +212,7 @@ class StudentsRepository {
         'success': true,
         'isOffline': true,
         'localId': localTempId,
-        'message': 'Élève enregistré localement en mode hors-ligne.',
+        'message': 'أ‰lأ¨ve enregistrأ© localement en mode hors-ligne.',
       };
     }
 
@@ -232,7 +242,7 @@ class StudentsRepository {
         'success': true,
         'isOffline': true,
         'localId': localTempId,
-        'message': 'Connexion instable. Élève mis en file d\'attente de synchronisation.',
+        'message': 'Connexion instable. أ‰lأ¨ve mis en file d\'attente de synchronisation.',
       };
     }
   }

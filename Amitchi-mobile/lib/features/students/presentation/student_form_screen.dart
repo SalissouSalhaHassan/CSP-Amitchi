@@ -23,20 +23,144 @@ class _StudentFormScreenState extends State<StudentFormScreen> {
   final StudentsRepository _repository = locator<StudentsRepository>();
   final _formKey = GlobalKey<FormState>();
 
+  int _currentStep = 0; // 0: Profil & Identité, 1: Dossier Famille, 2: Plan Financier
+
+  // Step 1: Identité & Profil
   late final TextEditingController _admissionController;
   late final TextEditingController _nameController;
   late final TextEditingController _arabicNameController;
+  late final TextEditingController _birthDateController;
+  late final TextEditingController _birthPlaceController;
+  late final TextEditingController _religionController;
+  late final TextEditingController _cnicController;
+  late final TextEditingController _pinController;
+  String _selectedSexe = 'Garcon';
+  String? _selectedBloodGroup;
+  String? _fingerprintHash;
+  String? _photoPath;
+
+  // Step 2: Dossier Famille & Contacts
+  late final TextEditingController _fatherController;
+  late final TextEditingController _fatherCnicController;
   late final TextEditingController _mobileController;
   late final TextEditingController _whatsappController;
-  late final TextEditingController _fatherController;
+  late final TextEditingController _fatherQualificationController;
+  late final TextEditingController _phoneFixeController;
+
+  // Académique
+  String? _selectedSession;
+  String? _selectedLevel;
+  String? _selectedClass;
+  String? _selectedSection;
+  String _selectedCategory = 'Général';
+  String _selectedStatus = 'Actif';
+  late final TextEditingController _behaviorController;
+
+  // Step 3: Plan Financier & Scolarité
   late final TextEditingController _monthlyController;
   late final TextEditingController _registrationController;
   late final TextEditingController _balanceController;
-  late final TextEditingController _behaviorController;
-  late final TextEditingController _pinController;
-  String? _fingerprintHash;
-  String? _photoPath;
+  late final TextEditingController _cogesCardController;
+  late final TextEditingController _transportInternatController;
+
   final ImagePicker _imagePicker = ImagePicker();
+
+  bool _isSaving = false;
+  bool _isLoadingOptions = true;
+  bool _hasFormPermission = false;
+
+  List<String> _sessions = ['2026-2027'];
+  List<String> _levels = [];
+  List<String> _sections = [];
+  List<String> _classes = [];
+
+  bool get _isEdit => widget.initialData?['id'] != null;
+
+  @override
+  void initState() {
+    super.initState();
+    final data = widget.initialData ?? {};
+
+    // 1. Identité
+    _admissionController = TextEditingController(text: data['num_admission']?.toString() ?? '');
+    _nameController = TextEditingController(text: data['nom_etudiant']?.toString() ?? '');
+    _arabicNameController = TextEditingController(text: data['nom_arabe']?.toString() ?? '');
+    _birthDateController = TextEditingController(text: data['date_naissance']?.toString() ?? '');
+    _birthPlaceController = TextEditingController(text: data['lieu_naissance']?.toString() ?? '');
+    _religionController = TextEditingController(text: data['religion']?.toString() ?? '');
+    _cnicController = TextEditingController(text: data['cnic']?.toString() ?? '');
+    _pinController = TextEditingController(text: data['activation_pin']?.toString() ?? '');
+    _selectedSexe = _normalizeSexe(data['sexe']?.toString());
+    _selectedBloodGroup = data['groupe_sanguin']?.toString();
+    _fingerprintHash = data['fingerprint_hash']?.toString();
+    _photoPath = data['photo_path']?.toString();
+
+    // 2. Famille
+    _fatherController = TextEditingController(text: data['nom_pere']?.toString() ?? '');
+    _fatherCnicController = TextEditingController(text: data['cnic_pere']?.toString() ?? '');
+    _mobileController = TextEditingController(text: data['mobile']?.toString() ?? '');
+    _whatsappController = TextEditingController(text: data['whatsapp']?.toString() ?? '');
+    _fatherQualificationController = TextEditingController(text: data['father_qualification']?.toString() ?? '');
+    _phoneFixeController = TextEditingController(text: data['phone_fixe']?.toString() ?? '');
+
+    // Académique
+    _selectedSession = data['session']?.toString() ?? '2026-2027';
+    _selectedLevel = data['educational_level']?.toString();
+    _selectedSection = data['section']?.toString();
+    _selectedClass = data['classe']?.toString();
+    _selectedCategory = data['categorie']?.toString() ?? 'Général';
+    _selectedStatus = data['statut']?.toString() ?? 'Actif';
+    _behaviorController = TextEditingController(text: data['behavior_score']?.toString() ?? '18');
+
+    // 3. Finances
+    _monthlyController = TextEditingController(text: data['frais_mensuels']?.toString() ?? '0');
+    _registrationController = TextEditingController(text: data['frais_inscription']?.toString() ?? '0');
+    _balanceController = TextEditingController(text: data['ancien_solde']?.toString() ?? '0');
+    _cogesCardController = TextEditingController(text: data['frais_coges_card']?.toString() ?? '1500');
+    _transportInternatController = TextEditingController(text: data['frais_transport_internat']?.toString() ?? '0');
+
+    _loadOptions();
+  }
+
+  @override
+  void dispose() {
+    _admissionController.dispose();
+    _nameController.dispose();
+    _arabicNameController.dispose();
+    _birthDateController.dispose();
+    _birthPlaceController.dispose();
+    _religionController.dispose();
+    _cnicController.dispose();
+    _pinController.dispose();
+
+    _fatherController.dispose();
+    _fatherCnicController.dispose();
+    _mobileController.dispose();
+    _whatsappController.dispose();
+    _fatherQualificationController.dispose();
+    _phoneFixeController.dispose();
+
+    _behaviorController.dispose();
+    _monthlyController.dispose();
+    _registrationController.dispose();
+    _balanceController.dispose();
+    _cogesCardController.dispose();
+    _transportInternatController.dispose();
+    super.dispose();
+  }
+
+  String _normalizeSexe(String? value) {
+    final raw = (value ?? '').toLowerCase();
+    if (raw.contains('f')) return 'Fille';
+    return 'Garcon';
+  }
+
+  void _generateRandomPin() {
+    final pin = (1000 + (DateTime.now().millisecondsSinceEpoch % 9000)).toString();
+    setState(() {
+      _pinController.text = pin;
+    });
+  }
 
   Future<void> _pickPhoto(ImageSource source) async {
     try {
@@ -55,7 +179,7 @@ class _StudentFormScreenState extends State<StudentFormScreen> {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('Photographie capturée avec succès !'),
+              content: Text('Photographie enregistrée !'),
               backgroundColor: Color(0xFF10B981),
             ),
           );
@@ -64,84 +188,6 @@ class _StudentFormScreenState extends State<StudentFormScreen> {
     } catch (e) {
       debugPrint('Error picking photo: $e');
     }
-  }
-
-  bool _isSaving = false;
-  bool _isLoadingOptions = true;
-  bool _hasFormPermission = false;
-  List<String> _levels = [];
-  List<String> _sections = [];
-  List<String> _classes = [];
-
-  String? _selectedLevel;
-  String? _selectedSection;
-  String? _selectedClass;
-  String _selectedSexe = 'Garcon';
-  String _selectedStatus = 'Actif';
-  String _selectedCategory = 'General';
-
-  bool get _isEdit => widget.initialData?['id'] != null;
-
-  @override
-  void initState() {
-    super.initState();
-    final data = widget.initialData ?? {};
-    _admissionController =
-        TextEditingController(text: data['num_admission']?.toString() ?? '');
-    _nameController =
-        TextEditingController(text: data['nom_etudiant']?.toString() ?? '');
-    _arabicNameController =
-        TextEditingController(text: data['nom_arabe']?.toString() ?? '');
-    _mobileController =
-        TextEditingController(text: data['mobile']?.toString() ?? '');
-    _whatsappController =
-        TextEditingController(text: data['whatsapp']?.toString() ?? '');
-    _fatherController =
-        TextEditingController(text: data['nom_pere']?.toString() ?? '');
-    _monthlyController =
-        TextEditingController(text: data['frais_mensuels']?.toString() ?? '0');
-    _registrationController = TextEditingController(
-      text: data['frais_inscription']?.toString() ?? '0',
-    );
-    _balanceController =
-        TextEditingController(text: data['ancien_solde']?.toString() ?? '0');
-    _behaviorController =
-        TextEditingController(text: data['behavior_score']?.toString() ?? '0');
-    _pinController =
-        TextEditingController(text: data['activation_pin']?.toString() ?? '');
-    _fingerprintHash = data['fingerprint_hash']?.toString();
-    _photoPath = data['photo_path']?.toString();
-
-    _selectedLevel = data['educational_level']?.toString();
-    _selectedSection = data['section']?.toString();
-    _selectedClass = data['classe']?.toString();
-    _selectedSexe = _normalizeSexe(data['sexe']?.toString());
-    _selectedStatus = data['statut']?.toString() ?? 'Actif';
-    _selectedCategory = data['categorie']?.toString() ?? 'General';
-
-    _loadOptions();
-  }
-
-  @override
-  void dispose() {
-    _admissionController.dispose();
-    _nameController.dispose();
-    _arabicNameController.dispose();
-    _mobileController.dispose();
-    _whatsappController.dispose();
-    _fatherController.dispose();
-    _monthlyController.dispose();
-    _registrationController.dispose();
-    _balanceController.dispose();
-    _behaviorController.dispose();
-    _pinController.dispose();
-    super.dispose();
-  }
-
-  String _normalizeSexe(String? value) {
-    final raw = (value ?? '').toLowerCase();
-    if (raw.contains('f')) return 'Fille';
-    return 'Garcon';
   }
 
   Future<void> _loadOptions() async {
@@ -153,15 +199,20 @@ class _StudentFormScreenState extends State<StudentFormScreen> {
       if (!mounted) return;
       setState(() {
         _hasFormPermission = true;
+        _sessions = (options['sessions'] != null && options['sessions']!.isNotEmpty)
+            ? options['sessions']!
+            : ['2026-2027'];
         _levels = (options['levels'] != null && options['levels']!.isNotEmpty)
             ? options['levels']!
-            : ['Maternelle', 'Primaire', 'Collège', 'Lycée', 'Licence', 'Master'];
+            : ['Primaire', 'Collège', 'Lycée'];
         _sections = (options['sections'] != null && options['sections']!.isNotEmpty)
             ? options['sections']!
-            : ['Section A', 'Section B', 'Section C'];
+            : ['Primaire Général', 'Section A'];
         _classes = (options['classes'] != null && options['classes']!.isNotEmpty)
             ? options['classes']!
-            : ['CI A', 'CP A', 'CE1 A', '6ème A', '2nde A', 'M2 Arabic'];
+            : ['CE1 A', '6ème A'];
+
+        _selectedSession ??= _sessions.first;
         _selectedLevel ??= _levels.first;
         _selectedSection ??= _sections.first;
         _selectedClass ??= _classes.first;
@@ -171,9 +222,11 @@ class _StudentFormScreenState extends State<StudentFormScreen> {
       if (!mounted) return;
       setState(() {
         _hasFormPermission = true;
-        _levels = ['Maternelle', 'Primaire', 'Collège', 'Lycée', 'Licence', 'Master'];
-        _sections = ['Section A', 'Section B', 'Section C'];
-        _classes = ['CI A', 'CP A', 'CE1 A', '6ème A', '2nde A', 'M2 Arabic'];
+        _sessions = ['2026-2027'];
+        _levels = ['Primaire', 'Collège', 'Lycée'];
+        _sections = ['Primaire Général', 'Section A'];
+        _classes = ['CE1 A', '6ème A'];
+        _selectedSession ??= _sessions.first;
         _selectedLevel ??= _levels.first;
         _selectedSection ??= _sections.first;
         _selectedClass ??= _classes.first;
@@ -197,31 +250,35 @@ class _StudentFormScreenState extends State<StudentFormScreen> {
       'nom_etudiant': _nameController.text.trim(),
       'nom_arabe': _arabicNameController.text.trim(),
       'sexe': _selectedSexe,
+      'date_naissance': _birthDateController.text.trim(),
+      'lieu_naissance': _birthPlaceController.text.trim(),
+      'religion': _religionController.text.trim(),
+      'cnic': _cnicController.text.trim(),
+      'groupe_sanguin': _selectedBloodGroup ?? '',
+      'activation_pin': _pinController.text.trim(),
+      'fingerprint_hash': _fingerprintHash ?? '',
+      'photo_path': _photoPath ?? '',
+
+      'session': _selectedSession,
       'educational_level': _selectedLevel,
       'classe': _selectedClass,
       'section': _selectedSection,
       'categorie': _selectedCategory,
+      'statut': _selectedStatus,
+      'behavior_score': double.tryParse(_behaviorController.text.trim().replaceAll(',', '.')) ?? 18,
+
       'nom_pere': _fatherController.text.trim(),
+      'cnic_pere': _fatherCnicController.text.trim(),
       'mobile': _mobileController.text.trim(),
       'whatsapp': _whatsappController.text.trim(),
-      'frais_mensuels':
-          double.tryParse(_monthlyController.text.trim().replaceAll(',', '.')) ??
-              0,
-      'frais_inscription': double.tryParse(
-            _registrationController.text.trim().replaceAll(',', '.'),
-          ) ??
-          0,
-      'ancien_solde':
-          double.tryParse(_balanceController.text.trim().replaceAll(',', '.')) ??
-              0,
-      'behavior_score': double.tryParse(
-            _behaviorController.text.trim().replaceAll(',', '.'),
-          ) ??
-          0,
-      'statut': _selectedStatus,
-      'activation_pin': _pinController.text.trim(),
-      'fingerprint_hash': _fingerprintHash ?? '',
-      'photo_path': _photoPath ?? '',
+      'father_qualification': _fatherQualificationController.text.trim(),
+      'phone_fixe': _phoneFixeController.text.trim(),
+
+      'frais_mensuels': double.tryParse(_monthlyController.text.trim().replaceAll(',', '.')) ?? 0,
+      'frais_inscription': double.tryParse(_registrationController.text.trim().replaceAll(',', '.')) ?? 0,
+      'ancien_solde': double.tryParse(_balanceController.text.trim().replaceAll(',', '.')) ?? 0,
+      'frais_coges_card': double.tryParse(_cogesCardController.text.trim().replaceAll(',', '.')) ?? 1500,
+      'frais_transport_internat': double.tryParse(_transportInternatController.text.trim().replaceAll(',', '.')) ?? 0,
     };
 
     final result = await _repository.saveStudent(
@@ -233,10 +290,16 @@ class _StudentFormScreenState extends State<StudentFormScreen> {
     setState(() => _isSaving = false);
 
     if (result['success'] == true) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(_isEdit ? 'Élève modifié avec succès !' : 'Nouvelle inscription enregistrée avec succès !'),
+          backgroundColor: const Color(0xFF10B981),
+        ),
+      );
       Navigator.pop(context, true);
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(result['error']?.toString() ?? 'Echec enregistrement')),
+        SnackBar(content: Text(result['error']?.toString() ?? 'Échec enregistrement')),
       );
     }
   }
@@ -244,349 +307,632 @@ class _StudentFormScreenState extends State<StudentFormScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
+      backgroundColor: const Color(0xFF0B0F19), // Dark sophisticated Web-matching theme
       appBar: AppBar(
-        backgroundColor: const Color(0xFFF8FAFC),
-        surfaceTintColor: const Color(0xFFF8FAFC),
-        title: Text(_isEdit ? 'Modifier etudiant' : 'Ajouter etudiant'),
+        backgroundColor: const Color(0xFF0F172A),
+        foregroundColor: Colors.white,
+        elevation: 0,
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'ADMINISTRATION SCOLAIRE',
+              style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1.2, color: Color(0xFF818CF8)),
+            ),
+            Text(
+              _isEdit ? 'MODIFIER LE DOSSIER ÉLÈVE' : 'NOUVELLE INSCRIPTION',
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900, letterSpacing: -0.3, color: Colors.white),
+            ),
+          ],
+        ),
+        actions: [
+          Container(
+            margin: const EdgeInsets.only(right: 14),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            decoration: BoxDecoration(
+              color: const Color(0xFF1E293B),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: const Color(0xFF334155)),
+            ),
+            child: Text(
+              'ÉTAPE ${_currentStep + 1} / 3',
+              style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w900, color: Color(0xFF38BDF8)),
+            ),
+          ),
+        ],
       ),
       body: _isLoadingOptions
-          ? const Center(child: CircularProgressIndicator())
+          ? const Center(child: CircularProgressIndicator(color: Color(0xFF6366F1)))
           : !_hasFormPermission
               ? const Center(
                   child: Padding(
                     padding: EdgeInsets.all(24),
                     child: Text(
-                      'Vous n avez pas la permission de modifier cette fiche.',
+                      'Vous n\'avez pas la permission d\'accéder à ce formulaire.',
                       textAlign: TextAlign.center,
+                      style: TextStyle(color: Colors.white70),
                     ),
                   ),
                 )
-          : Form(
-              key: _formKey,
-              child: ListView(
-                padding: const EdgeInsets.all(20),
-                children: [
-                  _section(
-                    'Identite',
-                    [
-                      _textField(_admissionController, 'Numero admission'),
-                      _textField(_nameController, 'Nom complet'),
-                      _textField(_arabicNameController, 'Nom arabe', required: false),
-                      _dropdown(
-                        label: 'Sexe',
-                        value: _selectedSexe,
-                        items: const ['Garcon', 'Fille'],
-                        onChanged: (value) => setState(() => _selectedSexe = value!),
+              : Column(
+                  children: [
+                    // Step Progress Tabs
+                    Container(
+                      color: const Color(0xFF0F172A),
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      child: Row(
+                        children: [
+                          _stepTab(0, '1. Profil Élève', Icons.person_rounded),
+                          const SizedBox(width: 8),
+                          _stepTab(1, '2. Dossier Famille', Icons.family_restroom_rounded),
+                          const SizedBox(width: 8),
+                          _stepTab(2, '3. Plan Financier', Icons.account_balance_wallet_rounded),
+                        ],
                       ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  _section(
-                    'Photographie de l\'Élève',
-                    [
-                      Container(
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF0F172A),
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: Row(
-                          children: [
-                            Container(
-                              width: 64,
-                              height: 64,
-                              decoration: BoxDecoration(
-                                color: const Color(0xFF1E293B),
-                                borderRadius: BorderRadius.circular(16),
-                                border: Border.all(color: const Color(0xFF334155), width: 1.5),
-                              ),
-                              child: ClipRRect(
-                                borderRadius: BorderRadius.circular(15),
-                                child: _photoPath != null && _photoPath!.isNotEmpty
-                                    ? (_photoPath!.startsWith("data:image")
-                                        ? Image.memory(
-                                            base64Decode(_photoPath!.split(',').last),
-                                            fit: BoxFit.cover,
-                                          )
-                                        : Image.network(
-                                            _photoPath!,
-                                            fit: BoxFit.cover,
-                                            errorBuilder: (_, __, ___) => const Icon(Icons.person, color: Colors.white54, size: 32),
-                                          ))
-                                    : const Icon(Icons.person, color: Colors.white54, size: 32),
-                              ),
-                            ),
-                            const SizedBox(width: 14),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  const Text(
-                                    "Photo du dossier",
-                                    style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
-                                  ),
-                                  const SizedBox(height: 2),
-                                  const Text(
-                                    "Requis pour la carte scolaire",
-                                    style: TextStyle(color: Color(0xFF94A3B8), fontSize: 10, fontWeight: FontWeight.w500),
-                                  ),
-                                  const SizedBox(height: 10),
-                                  Row(
-                                    children: [
-                                      Expanded(
-                                        child: ElevatedButton.icon(
-                                          onPressed: () => _pickPhoto(ImageSource.camera),
-                                          icon: const Icon(Icons.camera_alt, size: 14, color: Colors.white),
-                                          label: const Text("Caméra", style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.white)),
-                                          style: ElevatedButton.styleFrom(
-                                            backgroundColor: const Color(0xFF4F46E5),
-                                            padding: const EdgeInsets.symmetric(vertical: 8),
-                                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                                            elevation: 0,
-                                          ),
-                                        ),
-                                      ),
-                                      const SizedBox(width: 6),
-                                      Expanded(
-                                        child: OutlinedButton.icon(
-                                          onPressed: () => _pickPhoto(ImageSource.gallery),
-                                          icon: const Icon(Icons.photo_library, size: 14, color: Color(0xFF818CF8)),
-                                          label: const Text("Galerie", style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF818CF8))),
-                                          style: OutlinedButton.styleFrom(
-                                            side: const BorderSide(color: Color(0xFF312E81)),
-                                            backgroundColor: const Color(0xFF1E1B4B),
-                                            padding: const EdgeInsets.symmetric(vertical: 8),
-                                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  _section(
-                    'Sécurité & Biométrie',
-                    [
-                      _textField(
-                        _pinController,
-                        'Code PIN (4 chiffres)',
-                        required: false,
-                        keyboardType: TextInputType.number,
-                      ),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFF8FAFC),
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(
-                            color: _fingerprintHash != null && _fingerprintHash!.isNotEmpty
-                                ? const Color(0xFF10B981)
-                                : const Color(0xFFE2E8F0),
-                            width: 1.5,
+                    ),
+
+                    // Main Form Body
+                    Expanded(
+                      child: Form(
+                        key: _formKey,
+                        child: SingleChildScrollView(
+                          padding: const EdgeInsets.all(16),
+                          child: IndexedStack(
+                            index: _currentStep,
+                            children: [
+                              _buildStep1Profil(),
+                              _buildStep2Famille(),
+                              _buildStep3Finances(),
+                            ],
                           ),
                         ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            Row(
-                              children: [
-                                Container(
-                                  padding: const EdgeInsets.all(8),
-                                  decoration: BoxDecoration(
-                                    color: _fingerprintHash != null && _fingerprintHash!.isNotEmpty
-                                        ? const Color(0xFFD1FAE5)
-                                        : const Color(0xFFEEF2FF),
-                                    shape: BoxShape.circle,
-                                  ),
-                                  child: Icon(
-                                    Icons.fingerprint,
-                                    size: 24,
-                                    color: _fingerprintHash != null && _fingerprintHash!.isNotEmpty
-                                        ? const Color(0xFF10B981)
-                                        : const Color(0xFF4F46E5),
-                                  ),
-                                ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        _fingerprintHash != null && _fingerprintHash!.isNotEmpty
-                                            ? 'Empreinte Enregistrée'
-                                            : 'Empreinte Digitale',
-                                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF0F172A)),
-                                      ),
-                                      const SizedBox(height: 2),
-                                      Text(
-                                        _fingerprintHash != null && _fingerprintHash!.isNotEmpty
-                                            ? _fingerprintHash!
-                                            : 'Non définie (Appuyez pour scanner)',
-                                        style: TextStyle(
-                                          fontSize: 11,
-                                          fontWeight: FontWeight.w500,
-                                          color: _fingerprintHash != null && _fingerprintHash!.isNotEmpty
-                                              ? const Color(0xFF059669)
-                                              : const Color(0xFF64748B),
-                                        ),
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 10),
-                            SizedBox(
-                              width: double.infinity,
-                              child: ElevatedButton.icon(
-                                onPressed: () {
-                                  setState(() {
-                                    _fingerprintHash = 'FP-${DateTime.now().millisecondsSinceEpoch.toRadixString(36).toUpperCase()}';
-                                  });
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(
-                                      content: Row(
-                                        children: [
-                                          Icon(Icons.fingerprint, color: Colors.white, size: 20),
-                                          SizedBox(width: 8),
-                                          Text('Empreinte biométrique capturée !'),
-                                        ],
-                                      ),
-                                      backgroundColor: Color(0xFF10B981),
-                                    ),
-                                  );
-                                },
-                                icon: const Icon(Icons.touch_app, size: 16, color: Colors.white),
-                                label: Text(
-                                  _fingerprintHash != null && _fingerprintHash!.isNotEmpty
-                                      ? 'Re-scanner l\'empreinte'
-                                      : 'Scanner l\'empreinte',
-                                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white),
-                                ),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: _fingerprintHash != null && _fingerprintHash!.isNotEmpty
-                                      ? const Color(0xFF059669)
-                                      : const Color(0xFF4F46E5),
-                                  padding: const EdgeInsets.symmetric(vertical: 10),
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                                  elevation: 0,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
                       ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  _section(
-                    'Academique',
-                    [
-                      _dropdown(
-                        label: 'Niveau',
-                        value: _selectedLevel,
-                        items: _levels,
-                        onChanged: (value) => setState(() => _selectedLevel = value),
-                      ),
-                      _dropdown(
-                        label: 'Classe',
-                        value: _selectedClass,
-                        items: _classes,
-                        onChanged: (value) => setState(() => _selectedClass = value),
-                      ),
-                      _dropdown(
-                        label: 'Section',
-                        value: _selectedSection,
-                        items: _sections,
-                        onChanged: (value) => setState(() => _selectedSection = value),
-                      ),
-                      _dropdown(
-                        label: 'Categorie',
-                        value: _selectedCategory,
-                        items: const ['General', 'Boursier', 'Fils employe'],
-                        onChanged: (value) =>
-                            setState(() => _selectedCategory = value!),
-                      ),
-                      _dropdown(
-                        label: 'Statut',
-                        value: _selectedStatus,
-                        items: const ['Actif', 'En attente', 'Inactif', 'Diplome', 'Exclu'],
-                        onChanged: (value) =>
-                            setState(() => _selectedStatus = value!),
-                      ),
-                      _textField(_behaviorController, 'Conduite /20', keyboardType: TextInputType.number),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  _section(
-                    'Famille et contact',
-                    [
-                      _textField(_fatherController, 'Nom du tuteur'),
-                      _textField(
-                        _mobileController,
-                        'Mobile',
-                        keyboardType: TextInputType.phone,
-                      ),
-                      _textField(
-                        _whatsappController,
-                        'WhatsApp',
-                        keyboardType: TextInputType.phone,
-                        required: false,
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  _section(
-                    'Finances',
-                    [
-                      _textField(_monthlyController, 'Frais mensuels', keyboardType: TextInputType.number),
-                      _textField(_registrationController, 'Frais inscription', keyboardType: TextInputType.number),
-                      _textField(_balanceController, 'Ancien solde', keyboardType: TextInputType.number),
-                    ],
-                  ),
-                  const SizedBox(height: 24),
-                  ElevatedButton(
-                    onPressed: _isSaving || !_hasFormPermission ? null : _save,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.primary,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 16),
                     ),
-                    child: Text(_isSaving ? 'Enregistrement...' : 'Enregistrer'),
+
+                    // Bottom Navigation Bar
+                    _buildBottomBar(),
+                  ],
+                ),
+    );
+  }
+
+  Widget _stepTab(int stepIndex, String title, IconData icon) {
+    final isActive = _currentStep == stepIndex;
+    final isDone = _currentStep > stepIndex;
+
+    return Expanded(
+      child: InkWell(
+        onTap: () => setState(() => _currentStep = stepIndex),
+        borderRadius: BorderRadius.circular(12),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
+          decoration: BoxDecoration(
+            color: isActive
+                ? const Color(0xFF4F46E5)
+                : (isDone ? const Color(0xFF1E293B) : Colors.transparent),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: isActive
+                  ? const Color(0xFF6366F1)
+                  : (isDone ? const Color(0xFF10B981) : const Color(0xFF334155)),
+            ),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                isDone ? Icons.check_circle_rounded : icon,
+                size: 14,
+                color: isActive ? Colors.white : (isDone ? const Color(0xFF10B981) : const Color(0xFF94A3B8)),
+              ),
+              const SizedBox(width: 6),
+              Flexible(
+                child: Text(
+                  title,
+                  style: TextStyle(
+                    fontSize: 10.5,
+                    fontWeight: isActive ? FontWeight.w900 : FontWeight.w600,
+                    color: isActive ? Colors.white : (isDone ? const Color(0xFFCBD5E1) : const Color(0xFF94A3B8)),
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // -------------------------------------------------------------
+  // STEP 1: Profil Élève & Identité
+  // -------------------------------------------------------------
+  Widget _buildStep1Profil() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _darkCard(
+          title: 'INFORMATIONS D\'IDENTITÉ',
+          children: [
+            Row(
+              children: [
+                Expanded(child: _darkTextField(_admissionController, 'N° ADMISSION / MATRICULE *', hint: 'Ex: AD-2024-001', required: true)),
+                const SizedBox(width: 12),
+                Expanded(child: _darkTextField(_nameController, 'NOM COMPLET DE L\'ÉLÈVE *', hint: 'Jean Dupont', required: true)),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(child: _darkTextField(_arabicNameController, 'الاسم الكامل بالعربية', hint: 'اسم الطالب هنا', required: false, isRtl: true)),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _darkDropdown(
+                    label: 'SEXE DE L\'ENFANT *',
+                    value: _selectedSexe,
+                    items: const ['Garcon', 'Fille'],
+                    onChanged: (v) => setState(() => _selectedSexe = v!),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(child: _darkTextField(_birthDateController, 'DATE DE NAISSANCE', hint: 'YYYY-MM-DD', keyboardType: TextInputType.datetime, required: false)),
+                const SizedBox(width: 12),
+                Expanded(child: _darkTextField(_birthPlaceController, 'LIEU DE NAISSANCE', hint: 'Ville, Pays', required: false)),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(child: _darkTextField(_cnicController, 'CNIC / NUMÉRO NATIONAL', hint: 'Numéro d\'identification', required: false)),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _darkDropdown(
+                    label: 'GROUPE SANGUIN',
+                    value: _selectedBloodGroup,
+                    items: const ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'],
+                    onChanged: (v) => setState(() => _selectedBloodGroup = v),
+                    placeholder: '-- Choisir --',
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            _darkTextField(_religionController, 'RELIGION', hint: 'Islam / Christianisme...', required: false),
+          ],
+        ),
+
+        const SizedBox(height: 16),
+
+        // Photo Dossier Card
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: const Color(0xFF111827),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: const Color(0xFF1F2937)),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 72,
+                height: 72,
+                decoration: BoxDecoration(
+                  color: const Color(0xFF1E293B),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: const Color(0xFF334155)),
+                ),
+                child: _photoPath != null && _photoPath!.isNotEmpty
+                    ? ClipRRect(
+                        borderRadius: BorderRadius.circular(16),
+                        child: _photoPath!.startsWith('data:image')
+                            ? Image.memory(base64Decode(_photoPath!.split(',').last), fit: BoxFit.cover)
+                            : Image.network(_photoPath!, fit: BoxFit.cover),
+                      )
+                    : const Icon(Icons.person_rounded, size: 36, color: Color(0xFF64748B)),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('Photographie du dossier', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)),
+                    const Text('Requis pour la carte scolaire', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 11)),
+                    const SizedBox(height: 10),
+                    Row(
+                      children: [
+                        ElevatedButton.icon(
+                          onPressed: () => _pickPhoto(ImageSource.camera),
+                          icon: const Icon(Icons.camera_alt_rounded, size: 14, color: Colors.white),
+                          label: const Text('Caméra', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white)),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF4F46E5),
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        OutlinedButton.icon(
+                          onPressed: () => _pickPhoto(ImageSource.gallery),
+                          icon: const Icon(Icons.photo_library_rounded, size: 14, color: Color(0xFF818CF8)),
+                          label: const Text('Galerie', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF818CF8))),
+                          style: OutlinedButton.styleFrom(
+                            side: const BorderSide(color: Color(0xFF312E81)),
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+
+        const SizedBox(height: 16),
+
+        // Biométrie & Code PIN
+        _darkCard(
+          title: 'SÉCURITÉ & BIOMÉTRIE',
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: _darkTextField(
+                    _pinController,
+                    'CODE PIN ACCÈS (4 CHIFFRES)',
+                    hint: 'Ex: 1234',
+                    required: false,
+                    keyboardType: TextInputType.number,
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Padding(
+                  padding: const EdgeInsets.only(top: 18),
+                  child: ElevatedButton.icon(
+                    onPressed: _generateRandomPin,
+                    icon: const Icon(Icons.auto_fix_high_rounded, size: 14, color: Colors.white),
+                    label: const Text('Auto PIN', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white)),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF6366F1),
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: const Color(0xFF1E293B),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                  color: _fingerprintHash != null && _fingerprintHash!.isNotEmpty
+                      ? const Color(0xFF10B981)
+                      : const Color(0xFF334155),
+                ),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.fingerprint_rounded,
+                    size: 32,
+                    color: _fingerprintHash != null && _fingerprintHash!.isNotEmpty
+                        ? const Color(0xFF10B981)
+                        : const Color(0xFF6366F1),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          _fingerprintHash != null && _fingerprintHash!.isNotEmpty
+                              ? 'Empreinte Digitale Enregistrée'
+                              : 'Empreinte Digitale Biométrique',
+                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.white),
+                        ),
+                        Text(
+                          _fingerprintHash != null && _fingerprintHash!.isNotEmpty
+                              ? _fingerprintHash!
+                              : 'Pour pointage automatique sur bornes et mobile',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: _fingerprintHash != null && _fingerprintHash!.isNotEmpty
+                                ? const Color(0xFF34D399)
+                                : const Color(0xFF94A3B8),
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ),
+                  ),
+                  ElevatedButton(
+                    onPressed: () {
+                      setState(() {
+                        _fingerprintHash = 'FP-${DateTime.now().millisecondsSinceEpoch.toRadixString(36).toUpperCase()}';
+                      });
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: _fingerprintHash != null && _fingerprintHash!.isNotEmpty
+                          ? const Color(0xFF059669)
+                          : const Color(0xFF4F46E5),
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                    child: Text(
+                      _fingerprintHash != null && _fingerprintHash!.isNotEmpty ? 'Re-capturer' : 'Capturer',
+                      style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white),
+                    ),
                   ),
                 ],
               ),
             ),
+          ],
+        ),
+      ],
     );
   }
 
-  Widget _section(String title, List<Widget> children) {
+  // -------------------------------------------------------------
+  // STEP 2: Dossier Famille & Académique
+  // -------------------------------------------------------------
+  Widget _buildStep2Famille() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _darkCard(
+          title: 'DOSSIER FAMILLE & PARENTS',
+          children: [
+            _darkTextField(_fatherController, 'NOM COMPLET DU TUTEUR / PÈRE *', hint: 'Nom du responsable', required: true),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(child: _darkTextField(_mobileController, 'NUMÉRO MOBILE *', hint: '+227 00 00 00 00', keyboardType: TextInputType.phone, required: true)),
+                const SizedBox(width: 12),
+                Expanded(child: _darkTextField(_whatsappController, 'WHATSAPP PARENT', hint: '+227 00 00 00 00', keyboardType: TextInputType.phone, required: false)),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(child: _darkTextField(_fatherCnicController, 'CNIC DU PÈRE / TUTEUR', hint: 'Numéro d\'identité', required: false)),
+                const SizedBox(width: 12),
+                Expanded(child: _darkTextField(_phoneFixeController, 'TÉLÉPHONE FIXE', hint: 'Fixe ou bureau', keyboardType: TextInputType.phone, required: false)),
+              ],
+            ),
+            const SizedBox(height: 12),
+            _darkTextField(_fatherQualificationController, 'PROFESSION DU PÈRE / TUTEUR', hint: 'Ex: Enseignant, Commerçant...', required: false),
+          ],
+        ),
+
+        const SizedBox(height: 16),
+
+        _darkCard(
+          title: 'AFFECTATION ACADÉMIQUE',
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: _darkDropdown(
+                    label: 'SESSION ACADÉMIQUE *',
+                    value: _selectedSession,
+                    items: _sessions,
+                    onChanged: (v) => setState(() => _selectedSession = v),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _darkDropdown(
+                    label: 'NIVEAU SCOLAIRE *',
+                    value: _selectedLevel,
+                    items: _levels,
+                    onChanged: (v) => setState(() => _selectedLevel = v),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: _darkDropdown(
+                    label: 'CLASSE *',
+                    value: _selectedClass,
+                    items: _classes,
+                    onChanged: (v) => setState(() => _selectedClass = v),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _darkDropdown(
+                    label: 'SECTION *',
+                    value: _selectedSection,
+                    items: _sections,
+                    onChanged: (v) => setState(() => _selectedSection = v),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: _darkDropdown(
+                    label: 'CATÉGORIE ÉLÈVE',
+                    value: _selectedCategory,
+                    items: const ['Général', 'Boursier', 'Fils employé'],
+                    onChanged: (v) => setState(() => _selectedCategory = v!),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _darkDropdown(
+                    label: 'STATUT DU DOSSIER',
+                    value: _selectedStatus,
+                    items: const ['Actif', 'En attente', 'Inactif', 'Diplômé', 'Exclu'],
+                    onChanged: (v) => setState(() => _selectedStatus = v!),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            _darkTextField(_behaviorController, 'NOTE DE CONDUITE INITIALE (/20)', hint: '18', keyboardType: TextInputType.number, required: false),
+          ],
+        ),
+      ],
+    );
+  }
+
+  // -------------------------------------------------------------
+  // STEP 3: Plan Financier & Frais
+  // -------------------------------------------------------------
+  Widget _buildStep3Finances() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _darkCard(
+          title: 'PLAN FINANCIER & SCOLARITÉ',
+          children: [
+            Row(
+              children: [
+                Expanded(child: _darkTextField(_monthlyController, 'FRAIS MENSUELS (FCFA) *', hint: '40000', keyboardType: TextInputType.number, required: true)),
+                const SizedBox(width: 12),
+                Expanded(child: _darkTextField(_registrationController, 'FRAIS D\'INSCRIPTION (FCFA) *', hint: '5000', keyboardType: TextInputType.number, required: true)),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(child: _darkTextField(_cogesCardController, 'CARTE COGES / BADGE (FCFA)', hint: '1500', keyboardType: TextInputType.number, required: false)),
+                const SizedBox(width: 12),
+                Expanded(child: _darkTextField(_balanceController, 'ANCIEN SOLDE / DETTE (FCFA)', hint: '0', keyboardType: TextInputType.number, required: false)),
+              ],
+            ),
+            const SizedBox(height: 12),
+            _darkTextField(_transportInternatController, 'FRAIS TRANSPORT / INTERNAT (FCFA)', hint: '0', keyboardType: TextInputType.number, required: false),
+          ],
+        ),
+
+        const SizedBox(height: 16),
+
+        // Financial Recap summary banner
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: const Color(0xFF1E1B4B),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: const Color(0xFF4338CA)),
+          ),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: const BoxDecoration(
+                  color: Color(0xFF312E81),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.calculate_rounded, color: Color(0xFF818CF8), size: 24),
+              ),
+              const SizedBox(width: 14),
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Validation des engagements financiers',
+                      style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
+                    ),
+                    SizedBox(height: 2),
+                    Text(
+                      'Les échéances et reçus officiels seront générés automatiquement selon la session configurée.',
+                      style: TextStyle(color: Color(0xFFA5B4FC), fontSize: 11),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  // -------------------------------------------------------------
+  // Bottom Action Bar (Suivant / Précédent / Enregistrer)
+  // -------------------------------------------------------------
+  Widget _buildBottomBar() {
     return Container(
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: const Color(0xFFEBF0F5)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      color: const Color(0xFF0F172A),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      child: Row(
         children: [
-          Text(title, style: AppTextStyles.heading3),
-          const SizedBox(height: 12),
-          ...children.map(
-            (child) => Padding(
-              padding: const EdgeInsets.only(bottom: 12),
-              child: child,
+          if (_currentStep > 0)
+            Expanded(
+              child: OutlinedButton.icon(
+                onPressed: () => setState(() => _currentStep--),
+                icon: const Icon(Icons.arrow_back_rounded, size: 16, color: Color(0xFF94A3B8)),
+                label: const Text('PRÉCÉDENT', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Color(0xFF94A3B8))),
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  side: const BorderSide(color: Color(0xFF334155)),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                ),
+              ),
+            )
+          else
+            Expanded(
+              child: OutlinedButton(
+                onPressed: () => Navigator.pop(context),
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  side: const BorderSide(color: Color(0xFF334155)),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                ),
+                child: const Text('QUITTER', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Color(0xFF94A3B8))),
+              ),
+            ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: ElevatedButton.icon(
+              onPressed: _isSaving
+                  ? null
+                  : () {
+                      if (_currentStep < 2) {
+                        setState(() => _currentStep++);
+                      } else {
+                        _save();
+                      }
+                    },
+              icon: Icon(
+                _currentStep < 2 ? Icons.bolt_rounded : Icons.check_circle_rounded,
+                size: 16,
+                color: Colors.white,
+              ),
+              label: _isSaving
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                    )
+                  : Text(
+                      _currentStep < 2 ? 'SUIVANT' : 'ENREGISTRER',
+                      style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 12, color: Colors.white),
+                    ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF4F46E5),
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                elevation: 3,
+              ),
             ),
           ),
         ],
@@ -594,65 +940,128 @@ class _StudentFormScreenState extends State<StudentFormScreen> {
     );
   }
 
-  Widget _textField(
-    TextEditingController controller,
-    String label, {
-    bool required = true,
-    TextInputType keyboardType = TextInputType.text,
-  }) {
-    return TextFormField(
-      controller: controller,
-      keyboardType: keyboardType,
-      validator: required
-          ? (value) => (value == null || value.trim().isEmpty) ? 'Champ requis' : null
-          : null,
-      decoration: InputDecoration(
-        labelText: label,
-        filled: true,
-        fillColor: const Color(0xFFF8FAFC),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(16),
-          borderSide: const BorderSide(color: Color(0xFFEBF0F5)),
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(16),
-          borderSide: const BorderSide(color: Color(0xFFEBF0F5)),
-        ),
+  // -------------------------------------------------------------
+  // Helpers
+  // -------------------------------------------------------------
+  Widget _darkCard({required String title, required List<Widget> children}) {
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: const Color(0xFF111827),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: const Color(0xFF1F2937)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(width: 3, height: 14, decoration: BoxDecoration(color: const Color(0xFF6366F1), borderRadius: BorderRadius.circular(4))),
+              const SizedBox(width: 8),
+              Text(
+                title,
+                style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w900, letterSpacing: 0.8, color: Color(0xFF818CF8)),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          ...children,
+        ],
       ),
     );
   }
 
-  Widget _dropdown({
+  Widget _darkTextField(
+    TextEditingController controller,
+    String label, {
+    String? hint,
+    bool required = true,
+    bool isRtl = false,
+    TextInputType keyboardType = TextInputType.text,
+  }) {
+    return Column(
+      crossAxisAlignment: isRtl ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(fontSize: 9.5, fontWeight: FontWeight.w800, letterSpacing: 0.5, color: Color(0xFF94A3B8)),
+        ),
+        const SizedBox(height: 6),
+        TextFormField(
+          controller: controller,
+          keyboardType: keyboardType,
+          textDirection: isRtl ? TextDirection.rtl : TextDirection.ltr,
+          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
+          validator: required ? (v) => (v == null || v.trim().isEmpty) ? 'Requis' : null : null,
+          decoration: InputDecoration(
+            hintText: hint,
+            hintStyle: const TextStyle(color: Color(0xFF475569), fontSize: 12),
+            filled: true,
+            fillColor: const Color(0xFF0F172A),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(14),
+              borderSide: const BorderSide(color: Color(0xFF1E293B)),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(14),
+              borderSide: const BorderSide(color: Color(0xFF6366F1), width: 1.5),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _darkDropdown({
     required String label,
     required String? value,
     required List<String> items,
     required ValueChanged<String?> onChanged,
+    String? placeholder,
   }) {
     final safeValue = items.contains(value) ? value : null;
-    return DropdownButtonFormField<String>(
-      initialValue: safeValue,
-      items: items
-          .map(
-            (item) => DropdownMenuItem<String>(
-              value: item,
-              child: Text(item),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(fontSize: 9.5, fontWeight: FontWeight.w800, letterSpacing: 0.5, color: Color(0xFF94A3B8)),
+        ),
+        const SizedBox(height: 6),
+        DropdownButtonFormField<String>(
+          initialValue: safeValue,
+          dropdownColor: const Color(0xFF0F172A),
+          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
+          items: [
+            if (placeholder != null)
+              DropdownMenuItem<String>(
+                value: null,
+                child: Text(placeholder, style: const TextStyle(color: Color(0xFF64748B), fontSize: 12)),
+              ),
+            ...items.map(
+              (item) => DropdownMenuItem<String>(
+                value: item,
+                child: Text(item, style: const TextStyle(color: Colors.white, fontSize: 13)),
+              ),
             ),
-          )
-          .toList(),
-      onChanged: onChanged,
-      decoration: InputDecoration(
-        labelText: label,
-        filled: true,
-        fillColor: const Color(0xFFF8FAFC),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(16),
-          borderSide: const BorderSide(color: Color(0xFFEBF0F5)),
+          ],
+          onChanged: onChanged,
+          decoration: InputDecoration(
+            filled: true,
+            fillColor: const Color(0xFF0F172A),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(14),
+              borderSide: const BorderSide(color: Color(0xFF1E293B)),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(14),
+              borderSide: const BorderSide(color: Color(0xFF6366F1), width: 1.5),
+            ),
+          ),
         ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(16),
-          borderSide: const BorderSide(color: Color(0xFFEBF0F5)),
-        ),
-      ),
+      ],
     );
   }
 }
