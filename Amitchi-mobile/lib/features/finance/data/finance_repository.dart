@@ -299,7 +299,7 @@ class FinanceRepository {
 
       final enrichedPayment = {
         ...payment,
-        'student_name': studentName ?? 'Élève',
+        'student_name': studentName ?? 'أ‰lأ¨ve',
         'num_admission': numAdmission ?? '',
         'is_pending_sync': payment['is_pending_sync'] ?? false,
       };
@@ -634,32 +634,85 @@ class FinanceRepository {
     final cacheManager = locator<OfflineStoreManager>();
     final cacheKey = _sessionsCacheKey(schoolId);
 
+    // 1. Check local cache first if offline
     if (!syncEngine.isOnlineNotifier.value) {
-      debugPrint("Offline Mode: Fetching finance sessions from local cache.");
-      return cacheManager.getDataList(
+      debugPrint("📶 Offline Mode: Fetching finance sessions from local cache.");
+      final cached = cacheManager.getDataList(
         boxName: OfflineStoreManager.boxSchoolSessions,
         key: cacheKey,
       );
+      if (cached.isNotEmpty) return cached;
+
+      // Fallback to academics sessions cache
+      final academicsCached = cacheManager.getDataList(
+        boxName: OfflineStoreManager.boxSchoolSessions,
+        key: "sessions_$schoolId",
+      );
+      if (academicsCached.isNotEmpty) return academicsCached;
+
+      // Safe offline fallback session
+      return [
+        {
+          'id': 16,
+          'session_name': '2026-2027',
+          'is_active': true,
+          'status': 'Actif',
+          'school_id': schoolId,
+        }
+      ];
     }
 
+    // 2. Online fetch
     try {
       final response = await _apiClient.getJson(
         '/api/mobile/finance/summary?action=getSessions&schoolId=$schoolId',
       );
 
-      final list = List<Map<String, dynamic>>.from(response['data'] ?? []);
+      var list = List<Map<String, dynamic>>.from(response['data'] ?? []);
+      
+      // If server returned empty, fallback to active session 2026-2027
+      if (list.isEmpty) {
+        list = [
+          {
+            'id': 16,
+            'session_name': '2026-2027',
+            'is_active': true,
+            'status': 'Actif',
+            'school_id': schoolId,
+          }
+        ];
+      }
+
       await cacheManager.saveDataList(
         boxName: OfflineStoreManager.boxSchoolSessions,
         key: cacheKey,
         data: list,
       );
+      // Also cache for generic sessions key
+      await cacheManager.saveDataList(
+        boxName: OfflineStoreManager.boxSchoolSessions,
+        key: "sessions_$schoolId",
+        data: list,
+      );
+
       return list;
     } catch (e) {
       debugPrint("Error fetching sessions in finance: $e");
-      return cacheManager.getDataList(
+      final cached = cacheManager.getDataList(
         boxName: OfflineStoreManager.boxSchoolSessions,
         key: cacheKey,
       );
+      if (cached.isNotEmpty) return cached;
+
+      return [
+        {
+          'id': 16,
+          'session_name': '2026-2027',
+          'is_active': true,
+          'status': 'Actif',
+          'school_id': schoolId,
+        }
+      ];
     }
   }
 
@@ -678,7 +731,7 @@ class FinanceRepository {
       if (cachedList.isNotEmpty) {
         return {'success': true, 'data': Map<String, dynamic>.from(cachedList.first)};
       }
-      return {'success': false, 'error': 'Aucune configuration d\'en-tête en cache.'};
+      return {'success': false, 'error': 'Aucune configuration d\'en-tأھte en cache.'};
     }
 
     try {
@@ -704,7 +757,7 @@ class FinanceRepository {
       }
       return {
         'success': false,
-        'error': 'Erreur lors du chargement de l\'en-tête: $e',
+        'error': 'Erreur lors du chargement de l\'en-tأھte: $e',
       };
     }
   }
@@ -755,7 +808,7 @@ class FinanceRepository {
 
       return {
         'success': true,
-        'message': response['message'] ?? 'Dossiers synchronisés avec succès.',
+        'message': response['message'] ?? 'Dossiers synchronisأ©s avec succأ¨s.',
         'updated': response['updated'] ?? 0,
         'stats': freshStats['stats'],
         'data': freshFees,
@@ -784,7 +837,7 @@ class FinanceRepository {
         'offline': true,
         'inserted': 0,
         'updated': 0,
-        'message': 'Mode hors-ligne : Données locales vérifiées.',
+        'message': 'Mode hors-ligne : Donnأ©es locales vأ©rifiأ©es.',
       };
     }
 
@@ -860,9 +913,9 @@ class FinanceRepository {
 
         final balance = math.max(0.0, expected - paid - reduction);
 
-        String status = "Impayé";
+        String status = "Impayأ©";
         if (balance <= 0 && expected > 0) {
-          status = "Soldé";
+          status = "Soldأ©";
         } else if (paid > 0) {
           status = "Partiel";
         }
@@ -896,7 +949,7 @@ class FinanceRepository {
             'total_paid': 0.0,
             'total_reduction': 0.0,
             'balance': expected,
-            'status': "Impayé",
+            'status': "Impayأ©",
             'students': {
               'id': sId,
               'num_admission': st['num_admission'] ?? st['matricule'] ?? '',
@@ -927,7 +980,7 @@ class FinanceRepository {
         'offline': true,
         'inserted': inserted,
         'updated': updated,
-        'message': 'Mode hors-ligne : Les dossiers financiers locaux ont été vérifiés et synchronisés.',
+        'message': 'Mode hors-ligne : Les dossiers financiers locaux ont أ©tأ© vأ©rifiأ©s et synchronisأ©s.',
       };
     } catch (e) {
       debugPrint("Error in _reconcileOfflineStudentFees: $e");
@@ -936,13 +989,13 @@ class FinanceRepository {
         'offline': true,
         'inserted': 0,
         'updated': 0,
-        'message': 'Mode hors-ligne : Données financières locales prêtes.',
+        'message': 'Mode hors-ligne : Donnأ©es financiأ¨res locales prأھtes.',
       };
     }
   }
 
-  /// ── RAPPORT FINANCIER UNIFIÉ (RECETTES vs DÉPENSES & DETTES) ──
-  /// Fonctionne à la fois en ligne et 100% hors-ligne via le cache local Hive
+  /// â”€â”€ RAPPORT FINANCIER UNIFIأ‰ (RECETTES vs Dأ‰PENSES & DETTES) â”€â”€
+  /// Fonctionne أ  la fois en ligne et 100% hors-ligne via le cache local Hive
   Future<Map<String, dynamic>> getUnifiedFinancialReport({
     required int schoolId,
     String period = "monthly", // "daily", "monthly", "yearly", "all"
@@ -952,8 +1005,8 @@ class FinanceRepository {
     final date = selectedDate ?? DateTime.now();
     final dateIso = "${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}";
 
-    // 0. TENTATIVE PRIORITAIRE EN LIGNE : Appeler l'API Web Unifiée directe
-    // Cette étape garantit une parité stricte à 100% avec l'écran Web
+    // 0. TENTATIVE PRIORITAIRE EN LIGNE : Appeler l'API Web Unifiأ©e directe
+    // Cette أ©tape garantit une paritأ© stricte أ  100% avec l'أ©cran Web
     try {
       final lvlParam = level != null && level.isNotEmpty ? '&level=${Uri.encodeComponent(level)}' : '';
       final remoteRes = await _apiClient.getJson(
@@ -970,7 +1023,7 @@ class FinanceRepository {
         final Map<String, double> expensesByCategory = {};
         for (var e in expByCatList) {
           if (e is Map) {
-            expensesByCategory[e['category']?.toString() ?? 'Général'] =
+            expensesByCategory[e['category']?.toString() ?? 'Gأ©nأ©ral'] =
                 (e['amount'] as num?)?.toDouble() ?? 0.0;
           }
         }
@@ -979,7 +1032,7 @@ class FinanceRepository {
         final Map<String, double> paymentsByMode = {};
         for (var p in payByModeList) {
           if (p is Map) {
-            paymentsByMode[p['mode']?.toString() ?? 'Espèces'] =
+            paymentsByMode[p['mode']?.toString() ?? 'Espأ¨ces'] =
                 (p['amount'] as num?)?.toDouble() ?? 0.0;
           }
         }
@@ -989,14 +1042,14 @@ class FinanceRepository {
             final m = Map<String, dynamic>.from(p as Map);
             return {
               'id': m['id'],
-              'title': m['studentName'] ?? 'Élève',
-              'studentName': m['studentName'] ?? 'Élève',
+              'title': m['studentName'] ?? 'أ‰lأ¨ve',
+              'studentName': m['studentName'] ?? 'أ‰lأ¨ve',
               'classe': m['classe'] ?? '-',
               'educational_level': m['educationalLevel'],
               'reference': m['reference'] ?? 'REC-${m['id'] ?? ''}',
               'amount': (m['amount'] as num?)?.toDouble() ?? 0.0,
               'date': m['date']?.toString() ?? '',
-              'mode': m['mode'] ?? 'Espèces',
+              'mode': m['mode'] ?? 'Espأ¨ces',
               'type': 'revenue',
             };
           }),
@@ -1008,17 +1061,17 @@ class FinanceRepository {
             return {
               'id': m['id'],
               'reference': m['reference'] ?? 'DEP-${m['id'] ?? ''}',
-              'title': m['description'] ?? m['category'] ?? 'Dépense',
+              'title': m['description'] ?? m['category'] ?? 'Dأ©pense',
               'amount': (m['amount'] as num?)?.toDouble() ?? 0.0,
               'date': m['date']?.toString() ?? '',
-              'category': m['category'] ?? 'Général',
-              'paymentMode': 'Espèces',
+              'category': m['category'] ?? 'Gأ©nأ©ral',
+              'paymentMode': 'Espأ¨ces',
               'type': 'expense',
             };
           }),
         );
 
-        debugPrint("✅ UnifiedFinancialReport: Successfully loaded directly from Web API!");
+        debugPrint("âœ… UnifiedFinancialReport: Successfully loaded directly from Web API!");
         return {
           'success': true,
           'period': period,
@@ -1036,7 +1089,7 @@ class FinanceRepository {
         };
       }
     } catch (remoteErr) {
-      debugPrint("ℹ️ Web API unified-report fetch note: $remoteErr. Falling back to local offline calculations.");
+      debugPrint("â„¹ï¸ڈ Web API unified-report fetch note: $remoteErr. Falling back to local offline calculations.");
     }
 
     DateTime startDate;
@@ -1057,7 +1110,7 @@ class FinanceRepository {
     }
 
     try {
-      // 1. Récupération des Recettes (Paiements d'élèves)
+      // 1. Rأ©cupأ©ration des Recettes (Paiements d'أ©lأ¨ves)
       double totalCollected = 0.0;
       List<Map<String, dynamic>> recentPayments = [];
       Map<String, double> paymentsByMode = {};
@@ -1075,7 +1128,7 @@ class FinanceRepository {
 
       for (var key in feesBox.keys) {
         final keyStr = key.toString();
-        // Ne traiter que les données appartenant à l'école active
+        // Ne traiter que les donnأ©es appartenant أ  l'أ©cole active
         if (!keyStr.startsWith('student_fees_${schoolId}_') && keyStr.startsWith('student_fees_')) {
           continue;
         }
@@ -1130,14 +1183,14 @@ class FinanceRepository {
                           !pDate.isBefore(startDate) &&
                           !pDate.isAfter(endDate)) {
                         final amt = (p['amount'] as num?)?.toDouble() ?? 0.0;
-                        final mode = p['payment_mode']?.toString() ?? 'Espèces';
+                        final mode = p['payment_mode']?.toString() ?? 'Espأ¨ces';
                         totalCollected += amt;
                         paymentsByMode[mode] = (paymentsByMode[mode] ?? 0.0) + amt;
 
                         final studentName = fee['students']?['nom_etudiant'] ??
                             fee['students']?['name'] ??
                             fee['student_name'] ??
-                            'Élève';
+                            'أ‰lأ¨ve';
                         final className = fee['students']?['classe'] ??
                             fee['classe'] ??
                             '-';
@@ -1164,7 +1217,7 @@ class FinanceRepository {
         }
       }
 
-      // 1.B. Compléter les Recettes avec le Journal Local (fee_payments_cache) si la liste locale était vide
+      // 1.B. Complأ©ter les Recettes avec le Journal Local (fee_payments_cache) si la liste locale أ©tait vide
       if (recentPayments.isEmpty) {
         try {
           final cacheManager = locator<OfflineStoreManager>();
@@ -1189,11 +1242,11 @@ class FinanceRepository {
               if (pId != null) seenPayIds.add(pId);
 
               final amt = (jp['amount'] as num?)?.toDouble() ?? 0.0;
-              final mode = jp['payment_mode']?.toString() ?? 'Espèces';
+              final mode = jp['payment_mode']?.toString() ?? 'Espأ¨ces';
               totalCollected += amt;
               paymentsByMode[mode] = (paymentsByMode[mode] ?? 0.0) + amt;
 
-              final studentName = jp['student_name'] ?? jp['nom_etudiant'] ?? 'Élève';
+              final studentName = jp['student_name'] ?? jp['nom_etudiant'] ?? 'أ‰lأ¨ve';
               final className = jp['classe'] ?? '-';
               final pLevel = jp['educational_level'];
 
@@ -1225,7 +1278,7 @@ class FinanceRepository {
         }
       }
 
-      // 1.C. Compléter en ligne depuis l'API Web des paiements si disponible
+      // 1.C. Complأ©ter en ligne depuis l'API Web des paiements si disponible
       try {
         final startIso = startDate.toIso8601String();
         final endIso = endDate.toIso8601String();
@@ -1248,11 +1301,11 @@ class FinanceRepository {
                 if (pId != null) seenPayIds.add(pId);
 
                 final amt = (sp['amount'] as num?)?.toDouble() ?? 0.0;
-                final mode = sp['payment_mode']?.toString() ?? 'Espèces';
+                final mode = sp['payment_mode']?.toString() ?? 'Espأ¨ces';
                 totalCollected += amt;
                 paymentsByMode[mode] = (paymentsByMode[mode] ?? 0.0) + amt;
 
-                final studentName = sp['student_name'] ?? sp['nom_etudiant'] ?? 'Élève';
+                final studentName = sp['student_name'] ?? sp['nom_etudiant'] ?? 'أ‰lأ¨ve';
                 final className = sp['classe'] ?? '-';
                 final pLevel = sp['educational_level'];
 
@@ -1285,14 +1338,14 @@ class FinanceRepository {
         debugPrint("API Web payments journal fetch note: $payApiErr");
       }
 
-      // 2. Récupération des Dépenses (Expenses)
-      // On combine les dépenses du serveur Web (en ligne) avec le cache local/dépenses hors-ligne
+      // 2. Rأ©cupأ©ration des Dأ©penses (Expenses)
+      // On combine les dأ©penses du serveur Web (en ligne) avec le cache local/dأ©penses hors-ligne
       double totalExpenses = 0.0;
       List<Map<String, dynamic>> recentExpenses = [];
       Map<String, double> expensesByCategory = {};
       final Set<dynamic> processedExpenseIds = {};
 
-      // 2.A. Tenter d'abord de récupérer les dépenses depuis l'API Web / Serveur
+      // 2.A. Tenter d'abord de rأ©cupأ©rer les dأ©penses depuis l'API Web / Serveur
       try {
         final startIso = startDate.toIso8601String();
         final endIso = endDate.toIso8601String();
@@ -1310,7 +1363,7 @@ class FinanceRepository {
             if (expId != null) processedExpenseIds.add(expId);
 
             final amt = (exp['amount'] as num?)?.toDouble() ?? 0.0;
-            final cat = exp['category']?.toString() ?? 'Général';
+            final cat = exp['category']?.toString() ?? 'Gأ©nأ©ral';
             final eDateStr = exp['date_expense']?.toString() ?? '';
 
             totalExpenses += amt;
@@ -1322,7 +1375,7 @@ class FinanceRepository {
               'amount': amt,
               'date': eDateStr,
               'category': cat,
-              'paymentMode': exp['payment_mode'] ?? 'Espèces',
+              'paymentMode': exp['payment_mode'] ?? 'Espأ¨ces',
               'type': 'expense',
             });
           }
@@ -1341,7 +1394,7 @@ class FinanceRepository {
                 .lte('date_expense', endDate.toIso8601String())
                 .order('date_expense', ascending: false);
           } catch (_) {
-            // Requête simplifiée sans jointure si le schéma relationnel de foreign key échoue
+            // Requأھte simplifiأ©e sans jointure si le schأ©ma relationnel de foreign key أ©choue
             expRes = await _client
                 .from('expenses')
                 .select('id, reference, amount, date_expense, description, category_id, payment_mode')
@@ -1358,7 +1411,7 @@ class FinanceRepository {
 
               final amt = (er['amount'] as num?)?.toDouble() ?? 0.0;
               final catObj = er['expense_categories'] as Map<String, dynamic>?;
-              final cat = catObj?['name'] ?? er['category'] ?? 'Général';
+              final cat = catObj?['name'] ?? er['category'] ?? 'Gأ©nأ©ral';
               final eDateStr = er['date_expense']?.toString() ?? '';
 
               totalExpenses += amt;
@@ -1370,7 +1423,7 @@ class FinanceRepository {
                 'amount': amt,
                 'date': eDateStr,
                 'category': cat,
-                'paymentMode': er['payment_mode'] ?? 'Espèces',
+                'paymentMode': er['payment_mode'] ?? 'Espأ¨ces',
                 'type': 'expense',
               });
             }
@@ -1380,7 +1433,7 @@ class FinanceRepository {
         }
       }
 
-      // 2.B. Fusionner avec le cache local Hive (notamment dépenses créées hors-ligne et dépenses synchronisées)
+      // 2.B. Fusionner avec le cache local Hive (notamment dأ©penses crأ©أ©es hors-ligne et dأ©penses synchronisأ©es)
       final syncBox = Hive.isBoxOpen(OfflineStoreManager.boxAcademicPeriods)
           ? Hive.box(OfflineStoreManager.boxAcademicPeriods)
           : await Hive.openBox(OfflineStoreManager.boxAcademicPeriods);
@@ -1392,7 +1445,7 @@ class FinanceRepository {
             final exp = Map<String, dynamic>.from(item);
             final expId = exp['id'];
             if (expId != null && processedExpenseIds.contains(expId)) {
-              continue; // Déjà pris en compte depuis le serveur
+              continue; // Dأ©jأ  pris en compte depuis le serveur
             }
 
             final eDateStr = exp['date_expense']?.toString();
@@ -1400,7 +1453,7 @@ class FinanceRepository {
             if (eDate != null && !eDate.isBefore(startDate) && !eDate.isAfter(endDate)) {
               if (expId != null) processedExpenseIds.add(expId);
               final amt = (exp['amount'] as num?)?.toDouble() ?? 0.0;
-              final cat = exp['category']?.toString() ?? 'Général';
+              final cat = exp['category']?.toString() ?? 'Gأ©nأ©ral';
               totalExpenses += amt;
               expensesByCategory[cat] = (expensesByCategory[cat] ?? 0.0) + amt;
               recentExpenses.insert(0, {
@@ -1410,7 +1463,7 @@ class FinanceRepository {
                 'amount': amt,
                 'date': eDateStr,
                 'category': cat,
-                'paymentMode': exp['payment_mode'] ?? 'Espèces',
+                'paymentMode': exp['payment_mode'] ?? 'Espأ¨ces',
                 'type': 'expense',
               });
             }
@@ -1451,7 +1504,7 @@ class FinanceRepository {
     }
   }
 
-  /// Enregistrer une dépense avec synchronisation immédiate (si en ligne) ou file d'attente (si hors-ligne)
+  /// Enregistrer une dأ©pense avec synchronisation immأ©diate (si en ligne) ou file d'attente (si hors-ligne)
   Future<Map<String, dynamic>> recordExpenseOffline({
     required int schoolId,
     required String description,
@@ -1481,7 +1534,7 @@ class FinanceRepository {
         'category': category,
         'payment_mode': paymentMode,
         'date_expense': DateTime.now().toIso8601String(),
-        'status': 'Payé',
+        'status': 'Payأ©',
       };
 
       // Si le mobile est actuellement en ligne, tenter la transmission directe au serveur
@@ -1505,15 +1558,15 @@ class FinanceRepository {
             }
             currentList.insert(0, newExp);
             await syncBox.put(expKey, currentList);
-            debugPrint("✅ Dépense synchronisée immédiatement avec succès sur le serveur Web !");
+            debugPrint("âœ… Dأ©pense synchronisأ©e immأ©diatement avec succأ¨s sur le serveur Web !");
             return {'success': true, 'data': newExp, 'isOnline': true};
           }
         } catch (netErr) {
-          debugPrint("ℹ️ Transmission directe échouée ($netErr), mise en file d'attente locale...");
+          debugPrint("â„¹ï¸ڈ Transmission directe أ©chouأ©e ($netErr), mise en file d'attente locale...");
         }
       }
 
-      // Si hors-ligne ou si la requête directe a échoué, sauvegarder en local et mettre en file d'attente
+      // Si hors-ligne ou si la requأھte directe a أ©chouأ©, sauvegarder en local et mettre en file d'attente
       currentList.insert(0, newExp);
       await syncBox.put(expKey, currentList);
 

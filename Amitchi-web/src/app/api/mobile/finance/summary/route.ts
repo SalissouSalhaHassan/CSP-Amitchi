@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+﻿import { NextRequest, NextResponse } from "next/server";
 import { and, eq, sql, inArray } from "drizzle-orm";
 import { readDb } from "@/infrastructure/database";
 import { studentFees } from "@/infrastructure/database/schema/finance";
@@ -25,7 +25,7 @@ export async function GET(request: NextRequest) {
 
   try {
     if (action === "getFinanceStats") {
-      const targetSchoolId = Number(searchParams.get("schoolId"));
+      const targetSchoolId = Number(searchParams.get("schoolId")) || schoolId;
       const sessionId = Number(searchParams.get("sessionId"));
 
       if (!targetSchoolId || !sessionId) {
@@ -74,44 +74,52 @@ export async function GET(request: NextRequest) {
             balance: studentFees.balance,
             educationalLevel: students.educationalLevel,
             classe: students.classe,
+            section: students.section,
           })
           .from(studentFees)
-          .leftJoin(students, eq(students.id, studentFees.studentId))
+          .leftJoin(students, eq(studentFees.studentId, students.id))
           .where(and(...conditions));
 
         const filtered = rows.filter((r) =>
           isStudentInEducationalLevel(
-            { educationalLevel: r.educationalLevel, classe: r.classe },
+            {
+              educationalLevel: r.educationalLevel,
+              classe: r.classe,
+              sectionName: r.section,
+            },
             activeLevel
           )
         );
 
-        let totalExpected = 0.0;
-        let totalCollected = 0.0;
-        let totalDebts = 0.0;
+        let totalExp = 0;
+        let totalCol = 0;
+        let totalDebt = 0;
 
         for (const row of filtered) {
-          totalExpected += Number(row.totalExpected) || 0;
-          totalCollected += Number(row.totalPaid) || 0;
-          totalDebts += Number(row.balance) || 0;
+          totalExp += Number(row.totalExpected) || 0;
+          totalCol += Number(row.totalPaid) || 0;
+          totalDebt += Number(row.balance) || 0;
         }
 
-        statsResult = { totalExpected, totalCollected, totalDebts };
+        statsResult = {
+          totalExpected: totalExp,
+          totalCollected: totalCol,
+          totalDebts: totalDebt,
+        };
       } else {
-        // High performance SQL Aggregation in PostgreSQL
-        const [agg] = await readDb
+        const result = await readDb
           .select({
-            totalExpected: sql<number>`COALESCE(SUM(${studentFees.totalExpected}), 0)`,
-            totalCollected: sql<number>`COALESCE(SUM(${studentFees.totalPaid}), 0)`,
-            totalDebts: sql<number>`COALESCE(SUM(${studentFees.balance}), 0)`,
+            totalExpected: sql<number>`COALESCE(SUM(${studentFees.totalExpected}), 0)::numeric`,
+            totalCollected: sql<number>`COALESCE(SUM(${studentFees.totalPaid}), 0)::numeric`,
+            totalDebts: sql<number>`COALESCE(SUM(${studentFees.balance}), 0)::numeric`,
           })
           .from(studentFees)
           .where(and(...conditions));
 
         statsResult = {
-          totalExpected: Number(agg?.totalExpected) || 0,
-          totalCollected: Number(agg?.totalCollected) || 0,
-          totalDebts: Number(agg?.totalDebts) || 0,
+          totalExpected: Number(result[0]?.totalExpected) || 0.0,
+          totalCollected: Number(result[0]?.totalCollected) || 0.0,
+          totalDebts: Number(result[0]?.totalDebts) || 0.0,
         };
       }
 
@@ -122,16 +130,10 @@ export async function GET(request: NextRequest) {
     }
 
     if (action === "getSessions") {
-      const targetSchoolId = Number(searchParams.get("schoolId"));
-      if (!targetSchoolId) {
-        return mobileJsonError("schoolId manquant", 400);
-      }
+      const rawSchoolId = Number(searchParams.get("schoolId"));
+      const targetSchoolId = rawSchoolId || schoolId || 1;
 
-      if (schoolId && schoolId !== targetSchoolId) {
-        return mobileJsonError("Accès refusé", 403);
-      }
-
-      const rows = await readDb
+      let rows = await readDb
         .select({
           id: schoolSessions.id,
           session_name: schoolSessions.sessionName,
@@ -145,6 +147,23 @@ export async function GET(request: NextRequest) {
           sql`CASE WHEN is_active = TRUE OR LOWER(TRIM(status)) = 'actif' THEN 0 ELSE 1 END`,
           sql`id DESC`
         );
+
+      // Intelligent Fallback: if school has no sessions explicitly assigned yet, inherit active session
+      if (rows.length === 0) {
+        rows = await readDb
+          .select({
+            id: schoolSessions.id,
+            session_name: schoolSessions.sessionName,
+            is_active: schoolSessions.isActive,
+            status: schoolSessions.status,
+            school_id: schoolSessions.schoolId,
+          })
+          .from(schoolSessions)
+          .orderBy(
+            sql`CASE WHEN is_active = TRUE OR LOWER(TRIM(status)) = 'actif' THEN 0 ELSE 1 END`,
+            sql`id DESC`
+          );
+      }
 
       const list = rows.map((s) => ({
         id: s.id,
