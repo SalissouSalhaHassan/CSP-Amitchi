@@ -1,0 +1,30 @@
+﻿# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Testing
+coverage/
+
+# Next.js
+.next/
+out/
+build/
+dist/
+
+# Flutter / Dart
+.dart_tool/
+.packages
+.pub-cache/
+.pub/
+android/app/build/
+android/.gradle/
+
+# Production
+*.local
+.env.production.local
+
+# OS
+.DS_Store
+Thumbs.db
+*.swp

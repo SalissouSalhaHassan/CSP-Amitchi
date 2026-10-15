@@ -1,0 +1,14 @@
+- [x] Étape 1 : Implémenter le dessin dynamique des styles d'en-tête dans `bulletin-generator.ts`
+    - [x] Définir la fonction d'aide `drawPDFHeader` pour gérer les 5 styles
+    - [x] Mettre à jour `generateBulletinPDF` pour appeler `drawPDFHeader`
+    - [x] Mettre à jour `generateReleveNotesPDF` pour appeler `drawPDFHeader`
+- [x] Étape 2 : Implémenter le dessin dynamique des styles d'en-tête dans `ReceiptPreviewDialog.tsx`
+    - [x] Définir la fonction d'aide `drawReceiptPDFHeader` pour gérer les 5 styles
+    - [x] Mettre à jour `generatePDF` (jsPDF) pour utiliser `drawReceiptPDFHeader`
+- [x] Étape 3 : Support de la langue arabe dans les fichiers PDF générés
+    - [x] Créer l'action serveur et l'utilitaire de téléchargement de police (`font-downloader.ts`)
+    - [x] Créer la police Amiri (Base64) de secours dans `amiri-font.ts`
+    - [x] Créer l'algorithme de mise en forme arabe et d'inversion RTL dans `arabic-reshaper.ts`
+    - [x] Intégrer le rendu bilingue (`drawTextBilingual`) dans le générateur de bulletins et de reçus
+- [x] Étape 4 : Validation et tests
+    - [x] Confirmer qu'aucun bug TypeScript ou compilation n'intervient

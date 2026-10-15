@@ -1,0 +1,1 @@
+import { db } from './src/infrastructure/database'; import { sql } from 'drizzle-orm'; async function main() { await db.execute(sql`ALTER TABLE student_term_summaries ALTER COLUMN conduite TYPE varchar(100);`); console.log('Done'); process.exit(0); } main();
