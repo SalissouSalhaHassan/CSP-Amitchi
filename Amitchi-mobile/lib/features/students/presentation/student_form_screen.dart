@@ -312,30 +312,33 @@ class _StudentFormScreenState extends State<StudentFormScreen> {
         backgroundColor: const Color(0xFF0F172A),
         foregroundColor: Colors.white,
         elevation: 0,
+        titleSpacing: 0,
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
           children: [
             const Text(
-              'ADMINISTRATION SCOLAIRE',
-              style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1.2, color: Color(0xFF818CF8)),
+              'AMITCHI • GESTION SCOLAIRE',
+              style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.bold, letterSpacing: 1.0, color: Color(0xFF818CF8)),
             ),
             Text(
-              _isEdit ? 'MODIFIER LE DOSSIER ÉLÈVE' : 'NOUVELLE INSCRIPTION',
-              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900, letterSpacing: -0.3, color: Colors.white),
+              _isEdit ? 'Modifier Élève' : 'Nouvelle Inscription',
+              style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w900, color: Colors.white),
+              overflow: TextOverflow.ellipsis,
             ),
           ],
         ),
         actions: [
           Container(
-            margin: const EdgeInsets.only(right: 14),
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            margin: const EdgeInsets.only(right: 12),
+            padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
             decoration: BoxDecoration(
               color: const Color(0xFF1E293B),
-              borderRadius: BorderRadius.circular(10),
+              borderRadius: BorderRadius.circular(8),
               border: Border.all(color: const Color(0xFF334155)),
             ),
             child: Text(
-              'ÉTAPE ${_currentStep + 1} / 3',
+              '${_currentStep + 1}/3',
               style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w900, color: Color(0xFF38BDF8)),
             ),
           ),
@@ -359,14 +362,14 @@ class _StudentFormScreenState extends State<StudentFormScreen> {
                     // Step Progress Tabs
                     Container(
                       color: const Color(0xFF0F172A),
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                       child: Row(
                         children: [
-                          _stepTab(0, '1. Profil Élève', Icons.person_rounded),
-                          const SizedBox(width: 8),
-                          _stepTab(1, '2. Dossier Famille', Icons.family_restroom_rounded),
-                          const SizedBox(width: 8),
-                          _stepTab(2, '3. Plan Financier', Icons.account_balance_wallet_rounded),
+                          _stepTab(0, '1. Profil', Icons.person_rounded),
+                          const SizedBox(width: 6),
+                          _stepTab(1, '2. Famille', Icons.family_restroom_rounded),
+                          const SizedBox(width: 6),
+                          _stepTab(2, '3. Finances', Icons.account_balance_wallet_rounded),
                         ],
                       ),
                     ),
@@ -403,15 +406,15 @@ class _StudentFormScreenState extends State<StudentFormScreen> {
     return Expanded(
       child: InkWell(
         onTap: () => setState(() => _currentStep = stepIndex),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(10),
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 200),
-          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
+          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
           decoration: BoxDecoration(
             color: isActive
                 ? const Color(0xFF4F46E5)
                 : (isDone ? const Color(0xFF1E293B) : Colors.transparent),
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(10),
             border: Border.all(
               color: isActive
                   ? const Color(0xFF6366F1)
@@ -423,10 +426,10 @@ class _StudentFormScreenState extends State<StudentFormScreen> {
             children: [
               Icon(
                 isDone ? Icons.check_circle_rounded : icon,
-                size: 14,
+                size: 13,
                 color: isActive ? Colors.white : (isDone ? const Color(0xFF10B981) : const Color(0xFF94A3B8)),
               ),
-              const SizedBox(width: 6),
+              const SizedBox(width: 4),
               Flexible(
                 child: Text(
                   title,
@@ -455,18 +458,14 @@ class _StudentFormScreenState extends State<StudentFormScreen> {
         _darkCard(
           title: 'INFORMATIONS D\'IDENTITÉ',
           children: [
-            Row(
-              children: [
-                Expanded(child: _darkTextField(_admissionController, 'N° ADMISSION / MATRICULE *', hint: 'Ex: AD-2024-001', required: true)),
-                const SizedBox(width: 12),
-                Expanded(child: _darkTextField(_nameController, 'NOM COMPLET DE L\'ÉLÈVE *', hint: 'Jean Dupont', required: true)),
-              ],
-            ),
+            _darkTextField(_admissionController, 'N° ADMISSION / MATRICULE *', hint: 'Ex: AD-2024-001', required: true),
+            const SizedBox(height: 12),
+            _darkTextField(_nameController, 'NOM COMPLET DE L\'ÉLÈVE *', hint: 'Jean Dupont', required: true),
+            const SizedBox(height: 12),
+            _darkTextField(_arabicNameController, 'الاسم الكامل بالعربية', hint: 'اسم الطالب هنا', required: false, isRtl: true),
             const SizedBox(height: 12),
             Row(
               children: [
-                Expanded(child: _darkTextField(_arabicNameController, 'الاسم الكامل بالعربية', hint: 'اسم الطالب هنا', required: false, isRtl: true)),
-                const SizedBox(width: 12),
                 Expanded(
                   child: _darkDropdown(
                     label: 'SEXE DE L\'ENFANT *',
@@ -475,20 +474,6 @@ class _StudentFormScreenState extends State<StudentFormScreen> {
                     onChanged: (v) => setState(() => _selectedSexe = v!),
                   ),
                 ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                Expanded(child: _darkTextField(_birthDateController, 'DATE DE NAISSANCE', hint: 'YYYY-MM-DD', keyboardType: TextInputType.datetime, required: false)),
-                const SizedBox(width: 12),
-                Expanded(child: _darkTextField(_birthPlaceController, 'LIEU DE NAISSANCE', hint: 'Ville, Pays', required: false)),
-              ],
-            ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                Expanded(child: _darkTextField(_cnicController, 'CNIC / NUMÉRO NATIONAL', hint: 'Numéro d\'identification', required: false)),
                 const SizedBox(width: 12),
                 Expanded(
                   child: _darkDropdown(
@@ -501,6 +486,16 @@ class _StudentFormScreenState extends State<StudentFormScreen> {
                 ),
               ],
             ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(child: _darkTextField(_birthDateController, 'DATE NAISSANCE', hint: 'YYYY-MM-DD', keyboardType: TextInputType.datetime, required: false)),
+                const SizedBox(width: 12),
+                Expanded(child: _darkTextField(_birthPlaceController, 'LIEU NAISSANCE', hint: 'Ville, Pays', required: false)),
+              ],
+            ),
+            const SizedBox(height: 12),
+            _darkTextField(_cnicController, 'CNIC / NUMÉRO NATIONAL', hint: 'Numéro d\'identification', required: false),
             const SizedBox(height: 12),
             _darkTextField(_religionController, 'RELIGION', hint: 'Islam / Christianisme...', required: false),
           ],
@@ -519,8 +514,8 @@ class _StudentFormScreenState extends State<StudentFormScreen> {
           child: Row(
             children: [
               Container(
-                width: 72,
-                height: 72,
+                width: 70,
+                height: 70,
                 decoration: BoxDecoration(
                   color: const Color(0xFF1E293B),
                   borderRadius: BorderRadius.circular(16),
@@ -535,12 +530,13 @@ class _StudentFormScreenState extends State<StudentFormScreen> {
                       )
                     : const Icon(Icons.person_rounded, size: 36, color: Color(0xFF64748B)),
               ),
-              const SizedBox(width: 16),
+              const SizedBox(width: 14),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('Photographie du dossier', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)),
+                    const Text('Photographie du dossier', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
+                    const SizedBox(height: 2),
                     const Text('Requis pour la carte scolaire', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 11)),
                     const SizedBox(height: 10),
                     Row(
@@ -551,7 +547,7 @@ class _StudentFormScreenState extends State<StudentFormScreen> {
                           label: const Text('Caméra', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white)),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: const Color(0xFF4F46E5),
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                           ),
                         ),
@@ -562,7 +558,7 @@ class _StudentFormScreenState extends State<StudentFormScreen> {
                           label: const Text('Galerie', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF818CF8))),
                           style: OutlinedButton.styleFrom(
                             side: const BorderSide(color: Color(0xFF312E81)),
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                           ),
                         ),
@@ -581,34 +577,22 @@ class _StudentFormScreenState extends State<StudentFormScreen> {
         _darkCard(
           title: 'SÉCURITÉ & BIOMÉTRIE',
           children: [
-            Row(
-              children: [
-                Expanded(
-                  child: _darkTextField(
-                    _pinController,
-                    'CODE PIN ACCÈS (4 CHIFFRES)',
-                    hint: 'Ex: 1234',
-                    required: false,
-                    keyboardType: TextInputType.number,
-                  ),
+            _darkTextField(
+              _pinController,
+              'CODE PIN ACCÈS (4 CHIFFRES)',
+              hint: 'Ex: 1234',
+              required: false,
+              keyboardType: TextInputType.number,
+              suffix: TextButton.icon(
+                onPressed: _generateRandomPin,
+                icon: const Icon(Icons.auto_fix_high_rounded, size: 14, color: Color(0xFF818CF8)),
+                label: const Text('Auto PIN', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF818CF8))),
+                style: TextButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 10),
                 ),
-                const SizedBox(width: 10),
-                Padding(
-                  padding: const EdgeInsets.only(top: 18),
-                  child: ElevatedButton.icon(
-                    onPressed: _generateRandomPin,
-                    icon: const Icon(Icons.auto_fix_high_rounded, size: 14, color: Colors.white),
-                    label: const Text('Auto PIN', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white)),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF6366F1),
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                    ),
-                  ),
-                ),
-              ],
+              ),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 14),
             Container(
               padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
@@ -620,57 +604,78 @@ class _StudentFormScreenState extends State<StudentFormScreen> {
                       : const Color(0xFF334155),
                 ),
               ),
-              child: Row(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Icon(
-                    Icons.fingerprint_rounded,
-                    size: 32,
-                    color: _fingerprintHash != null && _fingerprintHash!.isNotEmpty
-                        ? const Color(0xFF10B981)
-                        : const Color(0xFF6366F1),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          _fingerprintHash != null && _fingerprintHash!.isNotEmpty
-                              ? 'Empreinte Digitale Enregistrée'
-                              : 'Empreinte Digitale Biométrique',
-                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.white),
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: _fingerprintHash != null && _fingerprintHash!.isNotEmpty
+                              ? const Color(0xFF065F46)
+                              : const Color(0xFF312E81),
+                          shape: BoxShape.circle,
                         ),
-                        Text(
-                          _fingerprintHash != null && _fingerprintHash!.isNotEmpty
-                              ? _fingerprintHash!
-                              : 'Pour pointage automatique sur bornes et mobile',
-                          style: TextStyle(
-                            fontSize: 11,
-                            color: _fingerprintHash != null && _fingerprintHash!.isNotEmpty
-                                ? const Color(0xFF34D399)
-                                : const Color(0xFF94A3B8),
-                          ),
-                          overflow: TextOverflow.ellipsis,
+                        child: Icon(
+                          Icons.fingerprint_rounded,
+                          size: 26,
+                          color: _fingerprintHash != null && _fingerprintHash!.isNotEmpty
+                              ? const Color(0xFF34D399)
+                              : const Color(0xFF818CF8),
                         ),
-                      ],
-                    ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              _fingerprintHash != null && _fingerprintHash!.isNotEmpty
+                                  ? 'Empreinte Digitale Enregistrée'
+                                  : 'Empreinte Digitale Biométrique',
+                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.white),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              _fingerprintHash != null && _fingerprintHash!.isNotEmpty
+                                  ? _fingerprintHash!
+                                  : 'Pour pointage automatique sur bornes et mobile',
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: _fingerprintHash != null && _fingerprintHash!.isNotEmpty
+                                    ? const Color(0xFF34D399)
+                                    : const Color(0xFF94A3B8),
+                              ),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
-                  ElevatedButton(
-                    onPressed: () {
-                      setState(() {
-                        _fingerprintHash = 'FP-${DateTime.now().millisecondsSinceEpoch.toRadixString(36).toUpperCase()}';
-                      });
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: _fingerprintHash != null && _fingerprintHash!.isNotEmpty
-                          ? const Color(0xFF059669)
-                          : const Color(0xFF4F46E5),
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                    ),
-                    child: Text(
-                      _fingerprintHash != null && _fingerprintHash!.isNotEmpty ? 'Re-capturer' : 'Capturer',
-                      style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white),
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      onPressed: () {
+                        setState(() {
+                          _fingerprintHash = 'FP-${DateTime.now().millisecondsSinceEpoch.toRadixString(36).toUpperCase()}';
+                        });
+                      },
+                      icon: const Icon(Icons.fingerprint, size: 16, color: Colors.white),
+                      label: Text(
+                        _fingerprintHash != null && _fingerprintHash!.isNotEmpty ? 'Re-capturer l\'empreinte' : 'Capturer l\'empreinte',
+                        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white),
+                      ),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: _fingerprintHash != null && _fingerprintHash!.isNotEmpty
+                            ? const Color(0xFF059669)
+                            : const Color(0xFF4F46E5),
+                        padding: const EdgeInsets.symmetric(vertical: 10),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      ),
                     ),
                   ),
                 ],
@@ -692,25 +697,25 @@ class _StudentFormScreenState extends State<StudentFormScreen> {
         _darkCard(
           title: 'DOSSIER FAMILLE & PARENTS',
           children: [
-            _darkTextField(_fatherController, 'NOM COMPLET DU TUTEUR / PÈRE *', hint: 'Nom du responsable', required: true),
+            _darkTextField(_fatherController, 'NOM DU TUTEUR / PÈRE *', hint: 'Nom du responsable', required: true),
             const SizedBox(height: 12),
             Row(
               children: [
-                Expanded(child: _darkTextField(_mobileController, 'NUMÉRO MOBILE *', hint: '+227 00 00 00 00', keyboardType: TextInputType.phone, required: true)),
+                Expanded(child: _darkTextField(_mobileController, 'MOBILE *', hint: '+227 00 00 00 00', keyboardType: TextInputType.phone, required: true)),
                 const SizedBox(width: 12),
-                Expanded(child: _darkTextField(_whatsappController, 'WHATSAPP PARENT', hint: '+227 00 00 00 00', keyboardType: TextInputType.phone, required: false)),
+                Expanded(child: _darkTextField(_whatsappController, 'WHATSAPP', hint: '+227 00 00 00 00', keyboardType: TextInputType.phone, required: false)),
               ],
             ),
             const SizedBox(height: 12),
             Row(
               children: [
-                Expanded(child: _darkTextField(_fatherCnicController, 'CNIC DU PÈRE / TUTEUR', hint: 'Numéro d\'identité', required: false)),
+                Expanded(child: _darkTextField(_fatherCnicController, 'CNIC TUTEUR', hint: 'Numéro d\'identité', required: false)),
                 const SizedBox(width: 12),
                 Expanded(child: _darkTextField(_phoneFixeController, 'TÉLÉPHONE FIXE', hint: 'Fixe ou bureau', keyboardType: TextInputType.phone, required: false)),
               ],
             ),
             const SizedBox(height: 12),
-            _darkTextField(_fatherQualificationController, 'PROFESSION DU PÈRE / TUTEUR', hint: 'Ex: Enseignant, Commerçant...', required: false),
+            _darkTextField(_fatherQualificationController, 'PROFESSION DU TUTEUR', hint: 'Ex: Enseignant, Commerçant...', required: false),
           ],
         ),
 
@@ -723,7 +728,7 @@ class _StudentFormScreenState extends State<StudentFormScreen> {
               children: [
                 Expanded(
                   child: _darkDropdown(
-                    label: 'SESSION ACADÉMIQUE *',
+                    label: 'SESSION *',
                     value: _selectedSession,
                     items: _sessions,
                     onChanged: (v) => setState(() => _selectedSession = v),
@@ -732,7 +737,7 @@ class _StudentFormScreenState extends State<StudentFormScreen> {
                 const SizedBox(width: 12),
                 Expanded(
                   child: _darkDropdown(
-                    label: 'NIVEAU SCOLAIRE *',
+                    label: 'NIVEAU *',
                     value: _selectedLevel,
                     items: _levels,
                     onChanged: (v) => setState(() => _selectedLevel = v),
@@ -767,7 +772,7 @@ class _StudentFormScreenState extends State<StudentFormScreen> {
               children: [
                 Expanded(
                   child: _darkDropdown(
-                    label: 'CATÉGORIE ÉLÈVE',
+                    label: 'CATÉGORIE',
                     value: _selectedCategory,
                     items: const ['Général', 'Boursier', 'Fils employé'],
                     onChanged: (v) => setState(() => _selectedCategory = v!),
@@ -776,7 +781,7 @@ class _StudentFormScreenState extends State<StudentFormScreen> {
                 const SizedBox(width: 12),
                 Expanded(
                   child: _darkDropdown(
-                    label: 'STATUT DU DOSSIER',
+                    label: 'STATUT',
                     value: _selectedStatus,
                     items: const ['Actif', 'En attente', 'Inactif', 'Diplômé', 'Exclu'],
                     onChanged: (v) => setState(() => _selectedStatus = v!),
@@ -804,21 +809,21 @@ class _StudentFormScreenState extends State<StudentFormScreen> {
           children: [
             Row(
               children: [
-                Expanded(child: _darkTextField(_monthlyController, 'FRAIS MENSUELS (FCFA) *', hint: '40000', keyboardType: TextInputType.number, required: true)),
+                Expanded(child: _darkTextField(_monthlyController, 'MENSUALITÉ (FCFA) *', hint: '40000', keyboardType: TextInputType.number, required: true)),
                 const SizedBox(width: 12),
-                Expanded(child: _darkTextField(_registrationController, 'FRAIS D\'INSCRIPTION (FCFA) *', hint: '5000', keyboardType: TextInputType.number, required: true)),
+                Expanded(child: _darkTextField(_registrationController, 'INSCRIPTION (FCFA) *', hint: '5000', keyboardType: TextInputType.number, required: true)),
               ],
             ),
             const SizedBox(height: 12),
             Row(
               children: [
-                Expanded(child: _darkTextField(_cogesCardController, 'CARTE COGES / BADGE (FCFA)', hint: '1500', keyboardType: TextInputType.number, required: false)),
+                Expanded(child: _darkTextField(_cogesCardController, 'CARTE COGES (FCFA)', hint: '1500', keyboardType: TextInputType.number, required: false)),
                 const SizedBox(width: 12),
-                Expanded(child: _darkTextField(_balanceController, 'ANCIEN SOLDE / DETTE (FCFA)', hint: '0', keyboardType: TextInputType.number, required: false)),
+                Expanded(child: _balanceController, 'ANCIEN SOLDE (FCFA)', hint: '0', keyboardType: TextInputType.number, required: false)),
               ],
             ),
             const SizedBox(height: 12),
-            _darkTextField(_transportInternatController, 'FRAIS TRANSPORT / INTERNAT (FCFA)', hint: '0', keyboardType: TextInputType.number, required: false),
+            _darkTextField(_transportInternatController, 'TRANSPORT / INTERNAT (FCFA)', hint: '0', keyboardType: TextInputType.number, required: false),
           ],
         ),
 
@@ -978,6 +983,7 @@ class _StudentFormScreenState extends State<StudentFormScreen> {
     bool required = true,
     bool isRtl = false,
     TextInputType keyboardType = TextInputType.text,
+    Widget? suffix,
   }) {
     return Column(
       crossAxisAlignment: isRtl ? CrossAxisAlignment.end : CrossAxisAlignment.start,
@@ -998,6 +1004,7 @@ class _StudentFormScreenState extends State<StudentFormScreen> {
             hintStyle: const TextStyle(color: Color(0xFF475569), fontSize: 12),
             filled: true,
             fillColor: const Color(0xFF0F172A),
+            suffixIcon: suffix,
             contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(14),
