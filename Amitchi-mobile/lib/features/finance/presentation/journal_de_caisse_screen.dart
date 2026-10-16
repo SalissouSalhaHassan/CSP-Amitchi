@@ -122,9 +122,21 @@ class _JournalDeCaisseScreenState extends State<JournalDeCaisseScreen> {
         sessionId: _selectedSessionId,
       );
 
+      // If active session has no payments, try fallback without session restriction
+      List<Map<String, dynamic>> finalPayments = payments;
+      if (finalPayments.isEmpty && _selectedSessionId != null) {
+        final allSessionPayments = await _repository.getPaymentsJournal(
+          schoolId: _schoolId,
+          sessionId: null,
+        );
+        if (allSessionPayments.isNotEmpty) {
+          finalPayments = allSessionPayments;
+        }
+      }
+
       if (mounted) {
         setState(() {
-          _rawPayments = payments;
+          _rawPayments = finalPayments;
           _applyFilters();
           _isLoading = false;
         });
@@ -152,7 +164,9 @@ class _JournalDeCaisseScreenState extends State<JournalDeCaisseScreen> {
           final cls = (p['classe'] ?? '').toString();
           final sec = (p['section'] ?? '').toString();
           final fil = (p['filiere'] ?? '').toString();
-          if (!EducationalLevelHelper.isStudentInEducationalLevel(
+          // If fields are populated, check level. If both are empty and it's a pending offline payment, don't drop it.
+          final hasLevelInfo = lvl.isNotEmpty || cls.isNotEmpty;
+          if (hasLevelInfo && !EducationalLevelHelper.isStudentInEducationalLevel(
             educationalLevel: lvl,
             className: cls,
             sectionName: sec,
@@ -201,8 +215,11 @@ class _JournalDeCaisseScreenState extends State<JournalDeCaisseScreen> {
 
         // 5. Statut
         if (_statusFilter != 'Tous') {
-          final status = (p['fee_status'] ?? '').toString();
-          if (status.toLowerCase() != _statusFilter.toLowerCase()) return false;
+          final status = (p['fee_status'] ?? '').toString().toLowerCase();
+          final filter = _statusFilter.toLowerCase();
+          final normStatus = status.replaceAll('é', 'e');
+          final normFilter = filter.replaceAll('é', 'e');
+          if (normStatus != normFilter && !status.contains(filter)) return false;
         }
 
         // 6. Dates
@@ -605,7 +622,41 @@ class _JournalDeCaisseScreenState extends State<JournalDeCaisseScreen> {
               ),
             ],
           ),
-          const SizedBox(height: 12),
+          // Row 0: Session Scolaire
+          if (_sessions.isNotEmpty) ...[
+            _buildDarkDropdown(
+              label: "ANNÉE / SESSION SCOLAIRE",
+              value: _selectedSessionId != null
+                  ? (_sessions.firstWhere(
+                      (s) => (s['id'] as num?)?.toInt() == _selectedSessionId,
+                      orElse: () => {'session_name': 'Toutes les sessions'},
+                    )['session_name']?.toString() ?? 'Toutes les sessions')
+                  : 'Toutes les sessions',
+              items: [
+                'Toutes les sessions',
+                ..._sessions.map((s) => s['session_name']?.toString() ?? '').where((s) => s.isNotEmpty),
+              ],
+              onChanged: (val) {
+                if (val == null) return;
+                setState(() {
+                  if (val == 'Toutes les sessions') {
+                    _selectedSessionId = null;
+                    _selectedSessionName = 'Toutes les sessions';
+                  } else {
+                    final found = _sessions.firstWhere(
+                      (s) => s['session_name']?.toString() == val,
+                      orElse: () => {},
+                    );
+                    _selectedSessionId = (found['id'] as num?)?.toInt();
+                    _selectedSessionName = val;
+                  }
+                  _isLoading = true;
+                });
+                _fetchJournalData();
+              },
+            ),
+            const SizedBox(height: 10),
+          ],
 
           // Row 1: Classe & Niveau
           Row(
@@ -1306,7 +1357,18 @@ class _JournalDeCaisseScreenState extends State<JournalDeCaisseScreen> {
                   cells: [
                     DataCell(Text("$idx", style: const TextStyle(color: Color(0xFF64748B), fontWeight: FontWeight.bold))),
                     DataCell(Text(pDate, style: const TextStyle(color: Color(0xFFCBD5E1)))),
-                    DataCell(Text(pRef, style: const TextStyle(color: Color(0xFF94A3B8), fontFamily: 'monospace'))),
+                    DataCell(
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(pRef, style: const TextStyle(color: Color(0xFF94A3B8), fontFamily: 'monospace')),
+                          if (p['is_pending_sync'] == true) ...[
+                            const SizedBox(width: 4),
+                            const Icon(Icons.cloud_upload_outlined, size: 12, color: Color(0xFFF59E0B)),
+                          ],
+                        ],
+                      ),
+                    ),
                     DataCell(Text(pStudent.toUpperCase(), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900))),
                     DataCell(Text(pClass.toUpperCase(), style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 10))),
                     DataCell(Text(pMode, style: const TextStyle(color: Color(0xFFE2E8F0)))),

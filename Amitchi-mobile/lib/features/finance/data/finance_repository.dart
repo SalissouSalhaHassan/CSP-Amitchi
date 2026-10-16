@@ -277,8 +277,16 @@ class FinanceRepository {
       final feeId = payment['fee_id'] ?? payment['feeId'];
       String? studentName = payment['student_name'];
       String? numAdmission = payment['num_admission'];
+      String? classe = payment['classe'];
+      String? educationalLevel = payment['educational_level'];
+      String? section = payment['section'];
+      String? filiere = payment['filiere'];
+      int? sessionId = (payment['session_id'] as num?)?.toInt() ??
+          (payment['sessionId'] as num?)?.toInt();
+      String? feeStatus = payment['fee_status'];
 
-      if ((studentName == null || numAdmission == null) && Hive.isBoxOpen(OfflineStoreManager.boxStudentFees)) {
+      if ((studentName == null || numAdmission == null || classe == null || educationalLevel == null) &&
+          Hive.isBoxOpen(OfflineStoreManager.boxStudentFees)) {
         final box = Hive.box(OfflineStoreManager.boxStudentFees);
         for (var key in box.keys) {
           if (!key.toString().startsWith('student_fees_')) continue;
@@ -289,25 +297,56 @@ class FinanceRepository {
                 final s = item['students'] is Map ? item['students'] : item;
                 studentName ??= s['nom_etudiant'] ?? s['nomPrenom'] ?? s['name'];
                 numAdmission ??= s['num_admission'] ?? s['matricule'];
+                classe ??= s['classe']?.toString();
+                educationalLevel ??= s['educational_level']?.toString() ?? s['educationalLevel']?.toString() ?? s['niveau']?.toString();
+                section ??= s['section']?.toString();
+                filiere ??= s['filiere']?.toString();
+                sessionId ??= (item['session_id'] as num?)?.toInt() ?? (item['sessionId'] as num?)?.toInt();
+                feeStatus ??= item['status']?.toString();
                 break;
               }
             }
           }
-          if (studentName != null) break;
+          if (studentName != null && classe != null) break;
         }
       }
 
       final enrichedPayment = {
         ...payment,
-        'student_name': studentName ?? 'أ‰lأ¨ve',
+        'student_name': studentName ?? 'Élève',
         'num_admission': numAdmission ?? '',
+        'classe': classe ?? '',
+        'educational_level': educationalLevel ?? '',
+        'section': section ?? '',
+        'filiere': filiere ?? '',
+        if (sessionId != null) 'session_id': sessionId,
+        if (feeStatus != null) 'fee_status': feeStatus,
         'is_pending_sync': payment['is_pending_sync'] ?? false,
       };
 
-      final journalKeys = [
+      // Collect all journal cache keys to update:
+      final journalKeys = <String>{
         _journalCacheKey(schoolId, null),
         "payments_journal_${schoolId}_all",
-      ];
+      };
+      if (sessionId != null) {
+        journalKeys.add(_journalCacheKey(schoolId, sessionId));
+      }
+
+      // Also check if there is an active session or cached sessions for this school
+      try {
+        final sessionsCacheKey = _sessionsCacheKey(schoolId);
+        final cachedSessions = cacheManager.getDataList(
+          boxName: OfflineStoreManager.boxStudentFees,
+          key: sessionsCacheKey,
+        );
+        for (final sess in cachedSessions) {
+          final sId = (sess['id'] as num?)?.toInt();
+          if (sId != null) {
+            journalKeys.add(_journalCacheKey(schoolId, sId));
+          }
+        }
+      } catch (_) {}
 
       for (final jKey in journalKeys) {
         final cachedJournal = cacheManager.getDataList(
@@ -326,6 +365,65 @@ class FinanceRepository {
     }
   }
 
+  /// Helper to merge offline pending payments from queue or local boxes into journal
+  List<Map<String, dynamic>> _mergePendingOfflinePayments(
+    List<Map<String, dynamic>> baseList,
+    int schoolId,
+    int? sessionId,
+  ) {
+    try {
+      final queueManager = locator<OfflineQueueManager>();
+      final pendingOps = queueManager.getPendingOperations();
+      final List<Map<String, dynamic>> pendingPayments = [];
+
+      for (final op in pendingOps) {
+        if (op.table == 'fee_payments' && op.action == 'record_payment') {
+          final d = op.data;
+          final opSchoolId = (d['schoolId'] as num?)?.toInt() ?? int.tryParse(d['schoolId']?.toString() ?? '') ?? 0;
+          if (opSchoolId != 0 && opSchoolId != schoolId) continue;
+
+          final opSessionId = (d['sessionId'] as num?)?.toInt() ?? int.tryParse(d['sessionId']?.toString() ?? '');
+          if (sessionId != null && opSessionId != null && opSessionId != sessionId) continue;
+
+          final ref = d['reference']?.toString() ?? '';
+          if (ref.isEmpty) continue;
+
+          pendingPayments.add({
+            'id': d['id'] ?? DateTime.now().millisecondsSinceEpoch,
+            'fee_id': d['feeId'],
+            'school_id': opSchoolId,
+            'amount': (d['amount'] as num?)?.toDouble() ?? double.tryParse(d['amount']?.toString() ?? '') ?? 0.0,
+            'reduction': (d['reduction'] as num?)?.toDouble() ?? double.tryParse(d['reduction']?.toString() ?? '') ?? 0.0,
+            'payment_mode': d['paymentMode']?.toString() ?? 'Espèces',
+            'reference': ref,
+            'month_concerned': d['monthConcerned']?.toString() ?? '',
+            'date_paid': d['date_paid']?.toString() ?? DateTime.now().toIso8601String(),
+            'recorded_by': d['recordedBy']?.toString() ?? 'Admin',
+            'student_name': d['student_name']?.toString() ?? d['studentName']?.toString() ?? 'Élève',
+            'num_admission': d['num_admission']?.toString() ?? d['numAdmission']?.toString() ?? '',
+            'classe': d['classe']?.toString() ?? '',
+            'educational_level': d['educational_level']?.toString() ?? d['educationalLevel']?.toString() ?? '',
+            'section': d['section']?.toString() ?? '',
+            'filiere': d['filiere']?.toString() ?? '',
+            'fee_status': d['fee_status']?.toString() ?? 'Partiel',
+            'is_pending_sync': true,
+          });
+        }
+      }
+
+      if (pendingPayments.isEmpty) return baseList;
+
+      final existingRefs = baseList.map((e) => e['reference']?.toString()).toSet();
+      final newToAdd = pendingPayments.where((p) => !existingRefs.contains(p['reference']?.toString())).toList();
+
+      if (newToAdd.isEmpty) return baseList;
+      return [...newToAdd, ...baseList];
+    } catch (e) {
+      debugPrint("Warning: could not merge pending offline payments: $e");
+      return baseList;
+    }
+  }
+
   /// Fetch full payments journal (Journal de caisse)
   Future<List<Map<String, dynamic>>> getPaymentsJournal({
     required int schoolId,
@@ -337,10 +435,28 @@ class FinanceRepository {
 
     if (!syncEngine.isOnlineNotifier.value) {
       debugPrint("Offline Mode: Fetching payments journal from local cache.");
-      return cacheManager.getDataList(
+      var localList = cacheManager.getDataList(
         boxName: OfflineStoreManager.boxFeePayments,
         key: cacheKey,
       );
+
+      // If specific session cache is empty, fallback to 'all' cache
+      if (localList.isEmpty && sessionId != null) {
+        final allKey = _journalCacheKey(schoolId, null);
+        final allList = cacheManager.getDataList(
+          boxName: OfflineStoreManager.boxFeePayments,
+          key: allKey,
+        );
+        if (allList.isNotEmpty) {
+          localList = allList.where((p) {
+            final pSess = (p['session_id'] as num?)?.toInt() ?? (p['sessionId'] as num?)?.toInt();
+            return pSess == null || pSess == sessionId;
+          }).toList();
+        }
+      }
+
+      // Always merge any pending offline payments from the queue
+      return _mergePendingOfflinePayments(localList, schoolId, sessionId);
     }
 
     try {
@@ -355,13 +471,27 @@ class FinanceRepository {
         key: cacheKey,
         data: list,
       );
-      return list;
+      // Merge pending unsynced payments so newly created offline receipts are never hidden
+      return _mergePendingOfflinePayments(list, schoolId, sessionId);
     } catch (e) {
       debugPrint("Error fetching payments journal: $e");
-      return cacheManager.getDataList(
+      var cached = cacheManager.getDataList(
         boxName: OfflineStoreManager.boxFeePayments,
         key: cacheKey,
       );
+      if (cached.isEmpty && sessionId != null) {
+        final allList = cacheManager.getDataList(
+          boxName: OfflineStoreManager.boxFeePayments,
+          key: _journalCacheKey(schoolId, null),
+        );
+        if (allList.isNotEmpty) {
+          cached = allList.where((p) {
+            final pSess = (p['session_id'] as num?)?.toInt() ?? (p['sessionId'] as num?)?.toInt();
+            return pSess == null || pSess == sessionId;
+          }).toList();
+        }
+      }
+      return _mergePendingOfflinePayments(cached, schoolId, sessionId);
     }
   }
 
@@ -378,6 +508,13 @@ class FinanceRepository {
     required double currentPaid,
     required double currentReduction,
     required double totalExpected,
+    String? studentName,
+    String? numAdmission,
+    String? classe,
+    String? educationalLevel,
+    String? section,
+    String? filiere,
+    int? sessionId,
     bool isFromSync = false,
   }) async {
     final syncEngine = locator<SyncEngine>();
@@ -425,6 +562,13 @@ class FinanceRepository {
           'currentPaid': currentPaid,
           'currentReduction': currentReduction,
           'totalExpected': totalExpected,
+          if (studentName != null) 'studentName': studentName,
+          if (numAdmission != null) 'numAdmission': numAdmission,
+          if (classe != null) 'classe': classe,
+          if (educationalLevel != null) 'educationalLevel': educationalLevel,
+          if (section != null) 'section': section,
+          if (filiere != null) 'filiere': filiere,
+          if (sessionId != null) 'sessionId': sessionId,
         },
       );
 
@@ -444,6 +588,14 @@ class FinanceRepository {
         'month_concerned': monthConcerned.isNotEmpty ? monthConcerned : null,
         'date_paid': DateTime.now().toIso8601String(),
         'recorded_by': recordedBy,
+        'student_name': studentName ?? 'Élève',
+        'num_admission': numAdmission ?? '',
+        'classe': classe ?? '',
+        'educational_level': educationalLevel ?? '',
+        'section': section ?? '',
+        'filiere': filiere ?? '',
+        if (sessionId != null) 'session_id': sessionId,
+        'fee_status': newStatus,
         'is_pending_sync': true,
       };
       await cacheManager.saveDataList(
@@ -573,6 +725,13 @@ class FinanceRepository {
           'currentPaid': currentPaid,
           'currentReduction': currentReduction,
           'totalExpected': totalExpected,
+          if (studentName != null) 'studentName': studentName,
+          if (numAdmission != null) 'numAdmission': numAdmission,
+          if (classe != null) 'classe': classe,
+          if (educationalLevel != null) 'educationalLevel': educationalLevel,
+          if (section != null) 'section': section,
+          if (filiere != null) 'filiere': filiere,
+          if (sessionId != null) 'sessionId': sessionId,
         },
       );
 
@@ -592,6 +751,14 @@ class FinanceRepository {
         'month_concerned': monthConcerned.isNotEmpty ? monthConcerned : null,
         'date_paid': DateTime.now().toIso8601String(),
         'recorded_by': recordedBy,
+        'student_name': studentName ?? 'Élève',
+        'num_admission': numAdmission ?? '',
+        'classe': classe ?? '',
+        'educational_level': educationalLevel ?? '',
+        'section': section ?? '',
+        'filiere': filiere ?? '',
+        if (sessionId != null) 'session_id': sessionId,
+        'fee_status': newStatus,
         'is_pending_sync': true,
       };
       await cacheManager.saveDataList(

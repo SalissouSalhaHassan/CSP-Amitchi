@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { and, eq, sql, desc } from "drizzle-orm";
+import { and, eq, sql, desc, or, isNull, inArray } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { db, readDb } from "@/infrastructure/database";
 import { studentFees, feePayments } from "@/infrastructure/database/schema/finance";
@@ -21,24 +21,19 @@ export async function GET(request: NextRequest) {
 
   // 1. GET FULL PAYMENTS JOURNAL (Journal de caisse)
   if (action === "getPaymentsJournal") {
-    const targetSchoolId = Number(searchParams.get("schoolId"));
+    const targetSchoolIdParam = searchParams.get("schoolId");
+    const rawTargetSchoolId = targetSchoolIdParam ? Number(targetSchoolIdParam) : null;
+    const effectiveSchoolId = (schoolId && schoolId > 0) ? schoolId : (rawTargetSchoolId && rawTargetSchoolId > 0 ? rawTargetSchoolId : 1);
     const sessionId = searchParams.get("sessionId") ? Number(searchParams.get("sessionId")) : null;
-
-    if (!targetSchoolId) {
-      return mobileJsonError("schoolId manquant", 400);
-    }
-
-    if (schoolId && schoolId !== targetSchoolId) {
-      return mobileJsonError("Accès refusé", 403);
-    }
 
     try {
       const conditions: any[] = [
-        eq(feePayments.schoolId, targetSchoolId),
+        or(eq(feePayments.schoolId, effectiveSchoolId), isNull(feePayments.schoolId)),
+        isNull(feePayments.deletedAt),
       ];
 
-      if (sessionId) {
-        conditions.push(eq(studentFees.sessionId, sessionId));
+      if (sessionId && sessionId > 0) {
+        conditions.push(or(eq(studentFees.sessionId, sessionId), isNull(studentFees.sessionId)));
       }
 
       if ((roleType === "parent" || roleType === "eleve") && user.studentId) {
@@ -62,12 +57,14 @@ export async function GET(request: NextRequest) {
           num_admission: students.numAdmission,
           classe: students.classe,
           educational_level: students.educationalLevel,
+          section: students.section,
+          filiere: students.filiere,
           fee_status: studentFees.status,
           total_expected: studentFees.totalExpected,
           balance: studentFees.balance,
         })
         .from(feePayments)
-        .innerJoin(studentFees, eq(studentFees.id, feePayments.feeId))
+        .leftJoin(studentFees, eq(studentFees.id, feePayments.feeId))
         .leftJoin(students, eq(students.id, studentFees.studentId))
         .where(and(...conditions))
         .orderBy(desc(feePayments.datePaid), desc(feePayments.id));
@@ -81,17 +78,23 @@ export async function GET(request: NextRequest) {
       );
 
       if (isLevelScoped && activeLevel) {
-        payments = payments.filter((p) =>
-          isStudentInEducationalLevel(
-            { educationalLevel: p.educational_level, classe: p.classe },
+        payments = payments.filter((p) => {
+          if (!p.educational_level && !p.classe) return true; // Don't drop payments if student link is unpopulated
+          return isStudentInEducationalLevel(
+            {
+              educationalLevel: p.educational_level,
+              classe: p.classe,
+              sectionName: p.section,
+              filiere: p.filiere,
+            },
             activeLevel
-          )
-        );
+          );
+        });
       }
 
       const list = payments.map((p) => ({
         id: p.id,
-        school_id: p.school_id,
+        school_id: p.school_id ?? effectiveSchoolId,
         fee_id: p.fee_id,
         amount: Number(p.amount) || 0,
         reduction: Number(p.reduction) || 0,
@@ -105,6 +108,8 @@ export async function GET(request: NextRequest) {
         num_admission: p.num_admission || "-",
         classe: p.classe || "-",
         educational_level: p.educational_level || "",
+        section: p.section || "",
+        filiere: p.filiere || "",
         fee_status: p.fee_status || "Soldé",
         total_expected: Number(p.total_expected) || 0,
         balance: Number(p.balance) || 0,
