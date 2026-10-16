@@ -54,7 +54,7 @@ interface UnifiedReportProps {
 export function UnifiedFinancialReportView({
   schoolName = "Établissement",
   activeSessionName = "2025–2026",
-  headerConfig = null,
+  headerConfig: initialHeaderConfig = null,
 }: UnifiedReportProps) {
   const [period, setPeriod] = useState<"daily" | "monthly" | "yearly" | "all">("monthly");
   const [selectedDate, setSelectedDate] = useState<string>(
@@ -64,6 +64,23 @@ export function UnifiedFinancialReportView({
   const [loading, setLoading] = useState(true);
   const [isExportingPdf, setIsExportingPdf] = useState(false);
   const [reportData, setReportData] = useState<any>(null);
+  const [headerConfig, setHeaderConfig] = useState<any>(initialHeaderConfig || null);
+
+  // Automatically fetch latest official document header config if not passed or when mounted
+  useEffect(() => {
+    if (initialHeaderConfig) {
+      setHeaderConfig(initialHeaderConfig);
+    } else {
+      import("@/domains/settings/actions/settings.actions").then(({ getDocumentHeaderConfig }) => {
+        getDocumentHeaderConfig().then((res) => {
+          if (res?.data) {
+            const cfg = (res.data as any).data || res.data;
+            setHeaderConfig(cfg);
+          }
+        }).catch((err) => console.warn("[UnifiedReport] Header config fetch fallback:", err));
+      });
+    }
+  }, [initialHeaderConfig]);
 
   // Available educational levels from headerProfiles and standards
   const availableLevels = React.useMemo(() => {
@@ -713,16 +730,31 @@ export function UnifiedFinancialReportView({
         )}
       </div>
 
-      {/* ── PRINT-ONLY OFFICIAL HEADER (SHOWN ONLY WHEN PRINTING) ── */}
-      <div className="hidden print:block bg-white text-black p-4 border-b-2 border-slate-900 mb-6">
+      {/* ── OFFICIAL DOCUMENT HEADER (GESTION DES PROFILS D'EN-TÊTES) ── */}
+      <div className="bg-white dark:bg-[#111827] text-slate-900 dark:text-white rounded-3xl border border-slate-200 dark:border-slate-800 p-6 sm:p-8 shadow-sm transition-all print:p-0 print:border-none print:shadow-none print:bg-white print:text-black">
         <OfficialDocumentHeader
           config={resolvedHeader}
-          title="RAPPORT FINANCIER UNIFIÉ (RECETTES VS DÉPENSES)"
+          title=""
         />
-        <div className="flex justify-between items-center text-xs font-bold border-t border-slate-300 pt-2 mt-2">
-          <span>Période : {getPeriodLabel()}</span>
-          <span>Session : {activeSessionName} | Édité le : {new Date().toLocaleDateString("fr-FR")}</span>
+        <div className="flex flex-wrap justify-between items-center text-xs font-bold text-slate-500 dark:text-slate-400 border-t border-slate-200/80 dark:border-slate-800 pt-3 mt-4 print:text-black print:border-slate-300">
+          <span className="flex items-center gap-1.5">
+            <span className="text-indigo-600 dark:text-indigo-400 font-black">●</span>
+            Période : {getPeriodLabel()}
+          </span>
+          <span className="font-mono text-[11px] text-indigo-600 dark:text-indigo-400 font-bold uppercase tracking-wider">
+            SESSION : {activeSessionName} &nbsp;|&nbsp; Édité le : {new Date().toLocaleDateString("fr-FR")}
+          </span>
         </div>
+      </div>
+
+      {/* ── TITLE BANNER (RAPPORT FINANCIER UNIFIÉ) ── */}
+      <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-2xl p-4 sm:p-5 shadow-sm">
+        <h3 className="text-base sm:text-lg font-black uppercase tracking-wide">
+          RAPPORT FINANCIER UNIFIÉ (RECETTES VS DÉPENSES)
+        </h3>
+        <p className="text-xs text-blue-100 font-bold uppercase tracking-wider mt-0.5">
+          {getPeriodLabel()}
+        </p>
       </div>
 
       {/* ── 3 PILLARS KPI CARDS: PAYÉ vs CONSOMMÉ vs SOLDE & DETTES ── */}
