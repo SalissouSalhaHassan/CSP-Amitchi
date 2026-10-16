@@ -1005,13 +1005,16 @@ class FinanceRepository {
     final date = selectedDate ?? DateTime.now();
     final dateIso = "${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}";
 
-    // 0. TENTATIVE PRIORITAIRE EN LIGNE : Appeler l'API Web Unifiأ©e directe
-    // Cette أ©tape garantit une paritأ© stricte أ  100% avec l'أ©cran Web
+    final cacheKey = "unified_report_${schoolId}_${period}_${dateIso}_${level ?? 'all'}";
+    final cacheManager = locator<OfflineStoreManager>();
+
+    // 0. TENTATIVE PRIORITAIRE EN LIGNE : Appeler l'API Web Unifiée avec un timeout serré (3s)
+    // pour éviter tout blocage ou lenteur si la connexion est instable ou absente.
     try {
       final lvlParam = level != null && level.isNotEmpty ? '&level=${Uri.encodeComponent(level)}' : '';
       final remoteRes = await _apiClient.getJson(
         '/api/mobile/finance/unified-report?schoolId=$schoolId&period=$period&selectedDate=$dateIso$lvlParam',
-      );
+      ).timeout(const Duration(seconds: 3));
 
       if (remoteRes['success'] == true && remoteRes['data'] is Map) {
         final serverData = Map<String, dynamic>.from(remoteRes['data'] as Map);
@@ -1023,7 +1026,7 @@ class FinanceRepository {
         final Map<String, double> expensesByCategory = {};
         for (var e in expByCatList) {
           if (e is Map) {
-            expensesByCategory[e['category']?.toString() ?? 'Gأ©nأ©ral'] =
+            expensesByCategory[e['category']?.toString() ?? 'Général'] =
                 (e['amount'] as num?)?.toDouble() ?? 0.0;
           }
         }
@@ -1032,7 +1035,7 @@ class FinanceRepository {
         final Map<String, double> paymentsByMode = {};
         for (var p in payByModeList) {
           if (p is Map) {
-            paymentsByMode[p['mode']?.toString() ?? 'Espأ¨ces'] =
+            paymentsByMode[p['mode']?.toString() ?? 'Espèces'] =
                 (p['amount'] as num?)?.toDouble() ?? 0.0;
           }
         }
@@ -1042,14 +1045,14 @@ class FinanceRepository {
             final m = Map<String, dynamic>.from(p as Map);
             return {
               'id': m['id'],
-              'title': m['studentName'] ?? 'أ‰lأ¨ve',
-              'studentName': m['studentName'] ?? 'أ‰lأ¨ve',
+              'title': m['studentName'] ?? 'Élève',
+              'studentName': m['studentName'] ?? 'Élève',
               'classe': m['classe'] ?? '-',
               'educational_level': m['educationalLevel'],
               'reference': m['reference'] ?? 'REC-${m['id'] ?? ''}',
               'amount': (m['amount'] as num?)?.toDouble() ?? 0.0,
               'date': m['date']?.toString() ?? '',
-              'mode': m['mode'] ?? 'Espأ¨ces',
+              'mode': m['mode'] ?? 'Espèces',
               'type': 'revenue',
             };
           }),
@@ -1061,18 +1064,18 @@ class FinanceRepository {
             return {
               'id': m['id'],
               'reference': m['reference'] ?? 'DEP-${m['id'] ?? ''}',
-              'title': m['description'] ?? m['category'] ?? 'Dأ©pense',
+              'title': m['description'] ?? m['category'] ?? 'Dépense',
               'amount': (m['amount'] as num?)?.toDouble() ?? 0.0,
               'date': m['date']?.toString() ?? '',
-              'category': m['category'] ?? 'Gأ©nأ©ral',
-              'paymentMode': 'Espأ¨ces',
+              'category': m['category'] ?? 'Général',
+              'paymentMode': 'Espèces',
               'type': 'expense',
             };
           }),
         );
 
-        debugPrint("âœ… UnifiedFinancialReport: Successfully loaded directly from Web API!");
-        return {
+        debugPrint("✅ UnifiedFinancialReport: Successfully loaded directly from Web API!");
+        final reportResult = {
           'success': true,
           'period': period,
           'selectedDate': date.toIso8601String(),
@@ -1087,9 +1090,28 @@ class FinanceRepository {
           'recentPayments': recentPayments,
           'recentExpenses': recentExpenses,
         };
+
+        // Cache the newly retrieved report for ultra-fast instant future opens
+        cacheManager.saveMap(
+          boxName: OfflineStoreManager.boxStudentFees,
+          key: cacheKey,
+          data: reportResult,
+        );
+
+        return reportResult;
       }
     } catch (remoteErr) {
-      debugPrint("â„¹ï¸ڈ Web API unified-report fetch note: $remoteErr. Falling back to local offline calculations.");
+      debugPrint("ℹ️ Web API unified-report fetch note: $remoteErr. Checking local cached report before calculating.");
+    }
+
+    // 1. FAST CACHE HIT: Vérifier si le bilan pour cette période est déjà présent dans le cache local
+    final cachedReport = cacheManager.getMap(
+      boxName: OfflineStoreManager.boxStudentFees,
+      key: cacheKey,
+    );
+    if (cachedReport != null && cachedReport.isNotEmpty) {
+      debugPrint("⚡ UnifiedFinancialReport: Served instantly from local persistent cache!");
+      return cachedReport;
     }
 
     DateTime startDate;
@@ -1476,7 +1498,7 @@ class FinanceRepository {
           ? ((totalExpenses / totalCollected) * 100).round()
           : 0;
 
-      return {
+      final localReportResult = {
         'success': true,
         'period': period,
         'selectedDate': date.toIso8601String(),
@@ -1491,6 +1513,15 @@ class FinanceRepository {
         'recentPayments': recentPayments,
         'recentExpenses': recentExpenses,
       };
+
+      // Cache the computed offline report for fast access
+      cacheManager.saveMap(
+        boxName: OfflineStoreManager.boxStudentFees,
+        key: cacheKey,
+        data: localReportResult,
+      );
+
+      return localReportResult;
     } catch (e) {
       debugPrint("Error in getUnifiedFinancialReport: $e");
       return {

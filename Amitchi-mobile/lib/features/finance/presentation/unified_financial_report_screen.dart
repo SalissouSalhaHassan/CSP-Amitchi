@@ -83,7 +83,6 @@ class _UnifiedFinancialReportScreenState
   }
 
   Future<void> _loadReport() async {
-    setState(() => _isLoading = true);
     final schoolIdStr = await _sessionManager.getSchoolId();
     final schoolId = int.tryParse(schoolIdStr ?? '9') ?? 9;
 
@@ -97,25 +96,51 @@ class _UnifiedFinancialReportScreenState
       }
     } catch (_) {}
 
-    // Load Header Config and Sessions in background
-    try {
-      final headerRes = await _financeRepo.getDocumentHeader(schoolId);
-      if (headerRes['success'] == true) {
-        _headerConfig = headerRes['data'] as Map<String, dynamic>?;
-      }
-    } catch (_) {}
+    // Check fast local cache first so UI is instant
+    final date = _selectedDate;
+    final dateIso = "${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}";
+    final cacheKey = "unified_report_${schoolId}_${_period}_${dateIso}_${_effectiveTargetLevel ?? 'all'}";
+    final cacheManager = locator<OfflineStoreManager>();
+    final cachedData = cacheManager.getMap(
+      boxName: OfflineStoreManager.boxStudentFees,
+      key: cacheKey,
+    );
 
-    try {
-      final sessions = await _financeRepo.getSessions(schoolId);
-      if (sessions.isNotEmpty) {
-        final active = sessions.firstWhere(
-          (s) => s['is_active'] == true || s['status']?.toString().toLowerCase() == 'actif',
-          orElse: () => sessions.first,
-        );
-        _sessionName = active['session_name']?.toString() ?? '2024–2025';
-      }
-    } catch (_) {}
+    if (cachedData != null && cachedData.isNotEmpty && mounted) {
+      setState(() {
+        _report = cachedData;
+        _isLoading = false;
+      });
+    } else {
+      if (mounted) setState(() => _isLoading = true);
+    }
 
+    // Load Header Config and Sessions in parallel
+    if (_headerConfig == null || _sessionName == '2024–2025') {
+      Future.wait([
+        _financeRepo.getDocumentHeader(schoolId).then((headerRes) {
+          if (headerRes['success'] == true && mounted) {
+            setState(() {
+              _headerConfig = headerRes['data'] as Map<String, dynamic>?;
+            });
+          }
+        }).catchError((_) {}),
+        _financeRepo.getSessions(schoolId).then((sessions) {
+          if (sessions.isNotEmpty && mounted) {
+            final active = sessions.firstWhere(
+              (s) => s['is_active'] == true || s['status']?.toString().toLowerCase() == 'actif',
+              orElse: () => sessions.first,
+            );
+            final name = active['session_name']?.toString();
+            if (name != null && name.isNotEmpty) {
+              setState(() => _sessionName = name);
+            }
+          }
+        }).catchError((_) {}),
+      ]);
+    }
+
+    // Fetch report data
     final data = await _financeRepo.getUnifiedFinancialReport(
       schoolId: schoolId,
       period: _period,

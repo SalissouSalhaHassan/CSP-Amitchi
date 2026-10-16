@@ -56,8 +56,16 @@ class UnifiedFinancialReportPdfGenerator {
     final pdf = pw.Document();
     final isA5 = pageFormat == PdfPageFormat.a5;
 
-    final amiriFont = await PdfGoogleFonts.amiriRegular();
-    final amiriBold = await PdfGoogleFonts.amiriBold();
+    // Load custom fonts to support Arabic/Unicode text with offline fallback
+    pw.Font amiriFont;
+    pw.Font amiriBold;
+    try {
+      amiriFont = await PdfGoogleFonts.amiriRegular().timeout(const Duration(seconds: 2));
+      amiriBold = await PdfGoogleFonts.amiriBold().timeout(const Duration(seconds: 2));
+    } catch (_) {
+      amiriFont = pw.Font.helvetica();
+      amiriBold = pw.Font.helveticaBold();
+    }
 
     // Determine effective target level: if targetLevel is provided and specific use it,
     // otherwise attempt to detect level from the first recent payments or classes in the report

@@ -53,6 +53,42 @@ class OfflineStoreManager {
     }
   }
 
+  /// Save raw JSON data map for a specific key in a box
+  Future<void> saveMap({
+    required String boxName,
+    required String key,
+    required Map<String, dynamic> data,
+  }) async {
+    try {
+      final box = Hive.box(boxName);
+      final cleanData = _cleanMap(data);
+      await box.put(key, cleanData);
+      debugPrint("💾 Cache Map Saved -> Box: $boxName, Key: $key");
+    } catch (e) {
+      debugPrint("❌ Error saving map in box $boxName: $e");
+    }
+  }
+
+  /// Get cached data map for a specific key
+  Map<String, dynamic>? getMap({
+    required String boxName,
+    required String key,
+  }) {
+    try {
+      if (!Hive.isBoxOpen(boxName)) return null;
+      final box = Hive.box(boxName);
+      final rawData = box.get(key);
+      if (rawData == null) return null;
+      if (rawData is Map) {
+        return _cleanMap(rawData);
+      }
+      return null;
+    } catch (e) {
+      debugPrint("❌ Error reading map from box $boxName: $e");
+      return null;
+    }
+  }
+
   /// Get cached data list for a specific key
   List<Map<String, dynamic>> getDataList({
     required String boxName,

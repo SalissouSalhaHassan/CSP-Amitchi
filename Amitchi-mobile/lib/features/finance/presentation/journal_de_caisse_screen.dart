@@ -1369,24 +1369,36 @@ class _JournalDeCaisseScreenState extends State<JournalDeCaisseScreen> {
   }
 
   void _openTransactionReceipt(Map<String, dynamic> payment) async {
-    final student = {
-      'nom_etudiant': payment['student_name'] ?? payment['nom_etudiant'] ?? 'Élève',
-      'num_admission': payment['num_admission'] ?? payment['matricule'] ?? '—',
-      'classe': payment['classe'] ?? '—',
-      'educational_level': payment['educational_level'] ?? '',
-    };
+    try {
+      final student = {
+        'nom_etudiant': payment['student_name'] ?? payment['nom_etudiant'] ?? 'Élève',
+        'num_admission': payment['num_admission'] ?? payment['matricule'] ?? '—',
+        'classe': payment['classe'] ?? '—',
+        'educational_level': payment['educational_level'] ?? '',
+      };
 
-    final totalExpected = (payment['total_expected'] as num?)?.toDouble() ?? (payment['amount'] as num?)?.toDouble() ?? 0.0;
-    final balance = (payment['balance'] as num?)?.toDouble() ?? 0.0;
+      final totalExpected = (payment['total_expected'] as num?)?.toDouble() ?? (payment['amount'] as num?)?.toDouble() ?? 0.0;
+      final balance = (payment['balance'] as num?)?.toDouble() ?? 0.0;
 
-    await ReceiptGenerator.showFormatAndActionDialog(
-      context: context,
-      student: student,
-      payment: payment,
-      totalExpected: totalExpected,
-      remainingBalance: balance,
-      headerConfig: _headerConfig,
-    );
+      await ReceiptGenerator.showFormatAndActionDialog(
+        context: context,
+        student: student,
+        payment: payment,
+        totalExpected: totalExpected,
+        remainingBalance: balance,
+        headerConfig: _headerConfig,
+      );
+    } catch (e) {
+      debugPrint("Error opening receipt dialog: $e");
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text("Impossible de générer le reçu : $e"),
+            backgroundColor: Colors.redAccent,
+          ),
+        );
+      }
+    }
   }
 
   // ───────────────────────────────────────────────────────────────────────────
