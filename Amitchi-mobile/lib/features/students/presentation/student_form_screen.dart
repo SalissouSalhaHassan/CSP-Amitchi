@@ -880,7 +880,7 @@ class _StudentFormScreenState extends State<StudentFormScreen> {
               children: [
                 Expanded(child: _darkTextField(_cogesCardController, 'CARTE COGES (FCFA)', hint: '1500', keyboardType: TextInputType.number, required: false)),
                 const SizedBox(width: 12),
-                Expanded(child: _balanceController, 'ANCIEN SOLDE (FCFA)', hint: '0', keyboardType: TextInputType.number, required: false)),
+                Expanded(child: _darkTextField(_balanceController, 'ANCIEN SOLDE (FCFA)', hint: '0', keyboardType: TextInputType.number, required: false)),
               ],
             ),
             const SizedBox(height: 12),

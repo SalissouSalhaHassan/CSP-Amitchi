@@ -4,6 +4,7 @@ import 'package:pdf/pdf.dart';
 import 'package:printing/printing.dart';
 import 'package:share_plus/share_plus.dart';
 
+import '../../../core/api/offline_store_manager.dart';
 import '../../../core/auth/session_manager.dart';
 import '../../../core/di/injection.dart';
 import '../../../core/utils/educational_level_helper.dart';
