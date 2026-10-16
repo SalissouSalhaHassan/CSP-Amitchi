@@ -38,6 +38,8 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
     _checkBiometricAvailability();
     if (widget.initialUsername != null && widget.initialUsername!.trim().isNotEmpty) {
       _emailController.text = widget.initialUsername!.trim();
+    } else {
+      _loadCachedEmailIfEmpty();
     }
 
     _animController = AnimationController(
@@ -59,6 +61,18 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
     ));
 
     _animController.forward();
+  }
+
+  Future<void> _loadCachedEmailIfEmpty() async {
+    try {
+      final session = locator<SessionManager>();
+      final cachedEmail = await session.getCachedOfflineEmail();
+      if (mounted && cachedEmail != null && cachedEmail.isNotEmpty && _emailController.text.isEmpty) {
+        setState(() {
+          _emailController.text = cachedEmail;
+        });
+      }
+    } catch (_) {}
   }
 
   Future<void> _checkBiometricAvailability() async {

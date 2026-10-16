@@ -4,6 +4,7 @@ import '../../../core/api/mobile_api_client.dart';
 import '../../../core/api/supabase_client.dart';
 import '../../../core/auth/session_manager.dart';
 import '../../../core/api/offline_store_manager.dart';
+import '../../../core/api/sync_engine.dart';
 import '../../../core/di/injection.dart';
 
 class LoginResult {
@@ -300,6 +301,12 @@ class AuthRepository {
         : '$normalizedEmail@test.com';
 
     debugPrint("DEBUG LOGIN: Attempting login for $primaryEmail (input: $rawInput) on server: ${MobileApiConfig.baseUrl}");
+
+    final syncEngine = locator.isRegistered<SyncEngine>() ? locator<SyncEngine>() : null;
+    if (syncEngine != null && !syncEngine.isOnlineNotifier.value) {
+      debugPrint("DEBUG LOGIN: Device is in OFFLINE mode. Directly authenticating via local offline cache...");
+      return await _handleOfflineLogin(email, password);
+    }
 
     // 1. PRIMARY STRATEGY: Authenticate against the active Edut Web server selected in UI
     // (e.g. edut-web-xi.vercel.app or custom server)
@@ -737,15 +744,6 @@ class AuthRepository {
         educationalLevel: userObj['educationalLevel']?.toString(),
         permissions: permissionsList.isNotEmpty ? permissionsList : null,
       );
-
-      // Invalidate stale caches so old school/students data (e.g. from previous logins) is never mixed
-      try {
-        final cacheManager = locator<OfflineStoreManager>();
-        await cacheManager.clearBox(OfflineStoreManager.boxStudents);
-        await cacheManager.clearBox(OfflineStoreManager.boxClassSubjects);
-      } catch (cacheErr) {
-        debugPrint("Warning clearing stale cache on login: $cacheErr");
-      }
 
       debugPrint("DEBUG LOGIN: Backend API login succeeded for ${userObj['utilisateur']} with role $role (School: $schoolIdStr)");
       return const LoginResult.success();

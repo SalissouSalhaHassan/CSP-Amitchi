@@ -2,6 +2,8 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/api/mobile_api_client.dart';
+import '../../../core/api/sync_engine.dart';
+import '../../../core/widgets/connectivity_widgets.dart';
 import '../../../core/di/injection.dart';
 import '../../../core/permissions/permission_service.dart';
 import '../../../core/theme/app_colors.dart';
@@ -223,11 +225,18 @@ class _StudentsManagementScreenState extends State<StudentsManagementScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
-                            'Consultez et suivez les informations des etudiants.',
-                            style: AppTextStyles.body.copyWith(
-                              color: AppColors.slate500,
-                            ),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  'Consultez et suivez les informations des etudiants.',
+                                  style: AppTextStyles.body.copyWith(
+                                    color: AppColors.slate500,
+                                  ),
+                                ),
+                              ),
+                              const CacheStatusChip(),
+                            ],
                           ),
                           const SizedBox(height: 18),
                           _buildStats(),
@@ -764,28 +773,61 @@ class _StudentsManagementScreenState extends State<StudentsManagementScreen> {
   }
 
   Widget _buildEmptyState() {
+    final isOnline = locator.isRegistered<SyncEngine>()
+        ? locator<SyncEngine>().isOnlineNotifier.value
+        : true;
+
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(28),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(
-              Icons.school_rounded,
-              size: 52,
-              color: AppColors.slate300,
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: !isOnline ? const Color(0xFFFEF3C7) : const Color(0xFFF1F5F9),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                !isOnline ? Icons.wifi_off_rounded : Icons.school_rounded,
+                size: 48,
+                color: !isOnline ? const Color(0xFFD97706) : AppColors.slate400,
+              ),
             ),
-            const SizedBox(height: 14),
+            const SizedBox(height: 16),
             Text(
-              'Aucun etudiant trouve',
+              !isOnline && _students.isEmpty
+                  ? 'Aucune donnée hors-ligne'
+                  : 'Aucun etudiant trouve',
               style: AppTextStyles.heading3,
+              textAlign: TextAlign.center,
             ),
             const SizedBox(height: 8),
             Text(
-              'Modifiez votre recherche ou rechargez la liste.',
+              !isOnline && _students.isEmpty
+                  ? 'Les données de cet établissement n\'ont pas encore été téléchargées localement.\nConnectez-vous à Internet une première fois pour synchroniser le catalogue des élèves.'
+                  : 'Modifiez vos critères de recherche ou réinitialisez les filtres.',
               textAlign: TextAlign.center,
-              style: AppTextStyles.body,
+              style: AppTextStyles.body.copyWith(
+                color: AppColors.slate500,
+                height: 1.4,
+              ),
             ),
+            if (!isOnline && _students.isEmpty) ...[
+              const SizedBox(height: 20),
+              ElevatedButton.icon(
+                onPressed: _loadStudents,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                ),
+                icon: const Icon(Icons.refresh_rounded, size: 18),
+                label: const Text('Réessayer la lecture locale'),
+              ),
+            ],
           ],
         ),
       ),
