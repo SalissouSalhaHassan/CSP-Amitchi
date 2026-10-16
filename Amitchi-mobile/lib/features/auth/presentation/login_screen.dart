@@ -7,6 +7,7 @@ import '../../../core/auth/session_manager.dart';
 import '../../../core/services/inactivity_lock_service.dart';
 import '../../../core/services/biometric_auth_service.dart';
 import '../../../core/api/mobile_api_client.dart';
+import '../../../core/api/sync_engine.dart';
 import '../data/auth_repository.dart';
 import 'server_config_dialog.dart';
 

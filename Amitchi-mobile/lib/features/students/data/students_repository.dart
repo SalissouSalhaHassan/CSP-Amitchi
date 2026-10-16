@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'dart:convert';
 import 'package:dio/dio.dart';
+import 'package:hive_flutter/hive_flutter.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/api/supabase_client.dart';
 import '../../../core/auth/session_manager.dart';
@@ -195,32 +196,42 @@ class StudentsRepository {
 
     // 1. Try from cached classes & subjects (OfflineStoreManager.boxClassSubjects)
     try {
-      final allClassesList = cacheManager.getAllData(boxName: OfflineStoreManager.boxClassSubjects);
-      for (final item in allClassesList) {
-        final cName = item['class_name'] ?? item['className'] ?? item['name'];
-        final sName = item['section_name'] ?? item['sectionName'];
-        final lName = item['educational_level'] ?? item['educationalLevel'] ?? item['level'];
-        if (cName != null && cName.toString().trim().isNotEmpty) {
-          final cStr = cName.toString().trim();
-          classes.add(cStr);
-          classesDetails.add({
-            'id': item['id'],
-            'className': cStr,
-            'sectionName': sName?.toString() ?? '',
-            'educationalLevel': lName?.toString() ?? '',
-            'scolariteMensuelle': item['scolarite_mensuelle'] ?? item['scolariteMensuelle'] ?? 0,
-            'droitsInscription': item['droits_inscription'] ?? item['droitsInscription'] ?? 0,
-            'cogesCarteId': item['coges_carte_id'] ?? item['cogesCarteId'] ?? 0,
-            'transportInternat': item['transport_internat'] ?? item['transportInternat'] ?? 0,
-            'ancienSolde': item['ancien_solde'] ?? item['ancienSolde'] ?? 0,
-            'statutInitial': item['statut_initial'] ?? item['statutInitial'] ?? 'Actif',
-          });
-        }
-        if (sName != null && sName.toString().trim().isNotEmpty) {
-          sections.add(sName.toString().trim());
-        }
-        if (lName != null && lName.toString().trim().isNotEmpty) {
-          levels.add(lName.toString().trim());
+      if (Hive.isBoxOpen(OfflineStoreManager.boxClassSubjects)) {
+        final box = Hive.box(OfflineStoreManager.boxClassSubjects);
+        for (final key in box.keys) {
+          final raw = box.get(key);
+          if (raw is List) {
+            for (final elem in raw) {
+              if (elem is Map) {
+                final item = Map<String, dynamic>.from(elem);
+                final cName = item['class_name'] ?? item['className'] ?? item['name'];
+                final sName = item['section_name'] ?? item['sectionName'];
+                final lName = item['educational_level'] ?? item['educationalLevel'] ?? item['level'];
+                if (cName != null && cName.toString().trim().isNotEmpty) {
+                  final cStr = cName.toString().trim();
+                  classes.add(cStr);
+                  classesDetails.add({
+                    'id': item['id'],
+                    'className': cStr,
+                    'sectionName': sName?.toString() ?? '',
+                    'educationalLevel': lName?.toString() ?? '',
+                    'scolariteMensuelle': item['scolarite_mensuelle'] ?? item['scolariteMensuelle'] ?? 0,
+                    'droitsInscription': item['droits_inscription'] ?? item['droitsInscription'] ?? 0,
+                    'cogesCarteId': item['coges_carte_id'] ?? item['cogesCarteId'] ?? 0,
+                    'transportInternat': item['transport_internat'] ?? item['transportInternat'] ?? 0,
+                    'ancienSolde': item['ancien_solde'] ?? item['ancienSolde'] ?? 0,
+                    'statutInitial': item['statut_initial'] ?? item['statutInitial'] ?? 'Actif',
+                  });
+                }
+                if (sName != null && sName.toString().trim().isNotEmpty) {
+                  sections.add(sName.toString().trim());
+                }
+                if (lName != null && lName.toString().trim().isNotEmpty) {
+                  levels.add(lName.toString().trim());
+                }
+              }
+            }
+          }
         }
       }
     } catch (_) {}
@@ -245,18 +256,28 @@ class StudentsRepository {
 
     // 3. Try from cached sessions (OfflineStoreManager.boxSchoolSessions)
     try {
-      final allSessions = cacheManager.getAllData(boxName: OfflineStoreManager.boxSchoolSessions);
-      for (final s in allSessions) {
-        final sessName = s['session_name'] ?? s['name'] ?? s['session'];
-        if (sessName != null && sessName.toString().trim().isNotEmpty) {
-          sessions.add(sessName.toString().trim());
+      if (Hive.isBoxOpen(OfflineStoreManager.boxSchoolSessions)) {
+        final box = Hive.box(OfflineStoreManager.boxSchoolSessions);
+        for (final key in box.keys) {
+          final raw = box.get(key);
+          if (raw is List) {
+            for (final elem in raw) {
+              if (elem is Map) {
+                final item = Map<String, dynamic>.from(elem);
+                final sessName = item['session_name'] ?? item['name'] ?? item['session'];
+                if (sessName != null && sessName.toString().trim().isNotEmpty) {
+                  sessions.add(sessName.toString().trim());
+                }
+              }
+            }
+          }
         }
       }
     } catch (_) {}
 
-    final finalLevels = levels.isNotEmpty ? levels.toList()..sort() : ['Primaire', 'Collège', 'Lycée'];
-    final finalSections = sections.isNotEmpty ? sections.toList()..sort() : ['Générale'];
-    final finalClasses = classes.isNotEmpty ? classes.toList()..sort() : ['6ème A', '5ème A', '4ème A', '3ème A', '2nde A', '1ère A', 'Tle A'];
+    final finalLevels = levels.isNotEmpty ? (levels.toList()..sort()) : ['Primaire', 'Collège', 'Lycée'];
+    final finalSections = sections.isNotEmpty ? (sections.toList()..sort()) : ['Générale'];
+    final finalClasses = classes.isNotEmpty ? (classes.toList()..sort()) : ['6ème A', '5ème A', '4ème A', '3ème A', '2nde A', '1ère A', 'Tle A'];
     final finalSessions = sessions.isNotEmpty ? sessions.toList() : ['2026-2027'];
 
     return {
@@ -266,7 +287,6 @@ class StudentsRepository {
       'sessions': finalSessions,
       'classesDetails': classesDetails,
     };
-  }
   }
 
   Future<Map<String, dynamic>> saveStudent({
