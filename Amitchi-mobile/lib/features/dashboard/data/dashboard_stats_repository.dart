@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'package:hive_flutter/hive_flutter.dart';
 import '../../../core/api/mobile_api_client.dart';
 import '../../../core/api/offline_store_manager.dart';
 import '../../../core/api/sync_engine.dart';
