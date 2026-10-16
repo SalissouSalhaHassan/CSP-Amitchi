@@ -112,9 +112,22 @@ export function UnifiedFinancialReportView({
     return null;
   }, [selectedLevel, reportData]);
 
-  // Dynamically resolved official document header based on educational level
+  // Dynamically resolved official document header based on educational level (French only / No Arabic)
   const resolvedHeader = React.useMemo(() => {
-    return getActiveLevelHeaderConfig(headerConfig || { schoolName }, effectiveLevel);
+    const base = getActiveLevelHeaderConfig(headerConfig || { schoolName }, effectiveLevel);
+    return {
+      ...base,
+      schoolNameAr: "",
+      countryAr: "",
+      ministryAr: "",
+      regionalDirectionAr: "",
+      departmentalDirectionAr: "",
+      inspectionAr: "",
+      communeAr: "",
+      campusSubtitleAr: "",
+      serviceAr: "",
+      mottoAr: "",
+    };
   }, [headerConfig, schoolName, effectiveLevel]);
 
   const isHigherEd = isHigherEducationLevel(effectiveLevel || "");
@@ -287,23 +300,19 @@ export function UnifiedFinancialReportView({
 
       // Institutional Header & Logo from dynamically resolved level profile
       const activeSchool = resolvedHeader?.schoolName || headerConfig?.schoolName || schoolName || "GROUPE SCOLAIRE";
-      const activeSchoolAr = resolvedHeader?.schoolNameAr || headerConfig?.schoolNameAr || (isHigherEd ? "جامعة التميز" : "المؤسسة التعليمية");
       const activeAddress = resolvedHeader?.address || headerConfig?.address || "Niamey, Niger";
       const activePhone = resolvedHeader?.phone || headerConfig?.phone || "+227 90 00 00 00";
       const activeEmail = resolvedHeader?.email || headerConfig?.email || "contact@edut.pro";
       const activeCountry = resolvedHeader?.country || headerConfig?.country || "RÉPUBLIQUE DU NIGER";
-      const activeCountryAr = resolvedHeader?.countryAr || headerConfig?.countryAr || "جمهورية النيجر";
       const activeMinistry = resolvedHeader?.ministry || headerConfig?.ministry || (isHigherEd ? "MINISTÈRE DE L'ENSEIGNEMENT SUPÉRIEUR ET DE LA RECHERCHE" : "Ministère de l'Éducation Nationale");
-      const activeMinistryAr = resolvedHeader?.ministryAr || headerConfig?.ministryAr || (isHigherEd ? "وزارة التعليم العالي والبحث العلمي" : "وزارة التربية الوطنية");
       const activeService = resolvedHeader?.service || headerConfig?.service || (isHigherEd ? "Agence Comptable Universitaire" : "Service de l'Intendance & Comptabilité");
-      const activeServiceAr = resolvedHeader?.serviceAr || headerConfig?.serviceAr || (isHigherEd ? "الوكالة المحاسبية الجامعية" : "مصلحة الشؤون المالية والمحاسبة");
       const activeLogo = resolvedHeader?.centerLogo || resolvedHeader?.leftLogo || resolvedHeader?.rightLogo || headerConfig?.centerLogo || headerConfig?.leftLogo || "";
 
       // Top colored accent bar
       doc.setFillColor(15, 23, 42); // Slate 900
       doc.rect(0, 0, W, 2.5, "F");
 
-      // Draw Institutional Header (Bilingual Left/Right with Logo in Center or Left)
+      // Draw Institutional Header
       let headerEndY = 28;
       const logoSize = 18;
       const logoTop = 6;
@@ -314,56 +323,41 @@ export function UnifiedFinancialReportView({
         } catch (_) {}
       }
 
-      // Left Column (French)
-      const leftColWidth = activeLogo ? 62 : 85;
+      // Left Column (French Official Header)
+      const leftColWidth = activeLogo ? 65 : 100;
       doc.setFont("helvetica", "bold");
-      doc.setFontSize(8);
+      doc.setFontSize(8.5);
       doc.setTextColor(15, 23, 42);
       doc.text(activeCountry.toUpperCase(), margin, 9);
 
       doc.setFont("helvetica", "normal");
-      doc.setFontSize(6.8);
+      doc.setFontSize(7);
       doc.setTextColor(71, 85, 105);
       doc.text(activeMinistry, margin, 13);
 
       doc.setFont("helvetica", "bold");
-      doc.setFontSize(10.5);
+      doc.setFontSize(11);
       doc.setTextColor(15, 23, 42);
       doc.text(activeSchool.toUpperCase(), margin, 18.5);
 
       doc.setFont("helvetica", "normal");
-      doc.setFontSize(6.5);
+      doc.setFontSize(6.8);
       doc.setTextColor(100, 116, 139);
       doc.text(activeService, margin, 22.5);
       doc.text(`${activeAddress} | Tél: ${activePhone}`, margin, 26);
 
-      // Right Column (Arabic & Session Meta)
+      // Right Column (Session & Date Meta)
       const rightColX = W - margin;
-      if (amiriFontBase64) {
-        try {
-          doc.setFont("Amiri", "normal");
-          doc.setFontSize(8.5);
-          doc.setTextColor(15, 23, 42);
-          doc.text(reshapeArabicText(activeCountryAr), rightColX, 9, { align: "right" });
-
-          doc.setFontSize(7.5);
-          doc.setTextColor(71, 85, 105);
-          doc.text(reshapeArabicText(activeMinistryAr), rightColX, 13, { align: "right" });
-
-          doc.setFontSize(11);
-          doc.setTextColor(15, 23, 42);
-          doc.text(reshapeArabicText(activeSchoolAr), rightColX, 18.5, { align: "right" });
-
-          doc.setFontSize(7);
-          doc.setTextColor(100, 116, 139);
-          doc.text(reshapeArabicText(activeServiceAr), rightColX, 22.5, { align: "right" });
-        } catch (_) {}
-      }
-
       doc.setFont("helvetica", "bold");
-      doc.setFontSize(6.8);
+      doc.setFontSize(7.5);
       doc.setTextColor(79, 70, 229);
-      doc.text(`SESSION : ${activeSessionName}  |  Édité le : ${new Date().toLocaleDateString("fr-FR")}`, rightColX, 26, { align: "right" });
+      doc.text(`SESSION : ${activeSessionName}`, rightColX, 18.5, { align: "right" });
+
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(7);
+      doc.setTextColor(100, 116, 139);
+      doc.text(`Édité le : ${new Date().toLocaleDateString("fr-FR")}`, rightColX, 23, { align: "right" });
+      doc.text(`Période : ${getPeriodLabel()}`, rightColX, 26, { align: "right" });
 
       headerEndY = 29;
 
