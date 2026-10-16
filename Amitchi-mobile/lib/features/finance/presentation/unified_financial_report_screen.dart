@@ -708,12 +708,21 @@ class _UnifiedFinancialReportScreenState
                     if (recentPayments.isEmpty)
                       _buildEmptyList("Aucun encaissement sur cette période.")
                     else
-                      ...recentPayments.map((p) => _buildTransactionTile(
-                            title: p['studentName'] ?? p['title'] ?? 'Paiement',
-                            subtitle: "${p['classe'] ?? '-'} • ${p['mode']} • ${p['date']?.toString().split('T')[0] ?? ''}",
-                            amount: (p['amount'] as num?)?.toDouble() ?? 0.0,
-                            isIncome: true,
-                          )),
+                      ...recentPayments.map((p) {
+                        final month = p['monthConcerned']?.toString();
+                        final motif = (month != null && month.isNotEmpty)
+                            ? "Scolarité ($month)"
+                            : (p['description']?.toString() ?? p['motif']?.toString() ?? "Frais de scolarité");
+                        final ref = p['reference']?.toString();
+                        final dateStr = p['date']?.toString().split('T')[0] ?? '';
+                        return _buildTransactionTile(
+                          title: p['studentName'] ?? p['title'] ?? 'Paiement',
+                          motif: motif,
+                          subtitle: "${p['classe'] ?? '-'} • ${p['mode']} ${ref != null ? '• $ref ' : ''}• $dateStr",
+                          amount: (p['amount'] as num?)?.toDouble() ?? 0.0,
+                          isIncome: true,
+                        );
+                      }),
 
                     const SizedBox(height: 16),
 
@@ -722,12 +731,18 @@ class _UnifiedFinancialReportScreenState
                     if (recentExpenses.isEmpty)
                       _buildEmptyList("Aucune dépense enregistrée sur cette période.")
                     else
-                      ...recentExpenses.map((e) => _buildTransactionTile(
-                            title: e['title'] ?? 'Dépense',
-                            subtitle: "${e['category']} • ${e['paymentMode'] ?? 'Espèces'} • ${e['date']?.toString().split('T')[0] ?? ''}",
-                            amount: (e['amount'] as num?)?.toDouble() ?? 0.0,
-                            isIncome: false,
-                          )),
+                      ...recentExpenses.map((e) {
+                        final desc = e['description']?.toString() ?? e['title']?.toString() ?? e['category']?.toString() ?? "Dépense";
+                        final ref = e['reference']?.toString();
+                        final dateStr = e['date']?.toString().split('T')[0] ?? '';
+                        return _buildTransactionTile(
+                          title: e['category'] ?? e['title'] ?? 'Dépense',
+                          motif: desc,
+                          subtitle: "${e['paymentMode'] ?? 'Espèces'} ${ref != null ? '• $ref ' : ''}• $dateStr",
+                          amount: (e['amount'] as num?)?.toDouble() ?? 0.0,
+                          isIncome: false,
+                        );
+                      }),
 
                     const SizedBox(height: 80),
                   ],
@@ -888,12 +903,13 @@ class _UnifiedFinancialReportScreenState
   Widget _buildTransactionTile({
     required String title,
     required String subtitle,
+    String? motif,
     required double amount,
     required bool isIncome,
   }) {
     final color = isIncome ? const Color(0xFF059669) : const Color(0xFFE11D48);
     return Container(
-      margin: const EdgeInsets.only(bottom: 6),
+      margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       decoration: BoxDecoration(
         color: Colors.white,
@@ -901,11 +917,12 @@ class _UnifiedFinancialReportScreenState
         border: Border.all(color: const Color(0xFFF1F5F9)),
       ),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           Icon(
             isIncome ? Icons.add_circle_outline : Icons.remove_circle_outline,
             color: color,
-            size: 20,
+            size: 22,
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -920,10 +937,38 @@ class _UnifiedFinancialReportScreenState
                     color: Color(0xFF1E293B),
                   ),
                 ),
-                Text(subtitle, style: const TextStyle(fontSize: 10, color: Color(0xFF94A3B8))),
+                if (motif != null && motif.isNotEmpty) ...[
+                  const SizedBox(height: 2),
+                  Row(
+                    children: [
+                      Text(
+                        "Motif : ",
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                          color: isIncome ? const Color(0xFF4F46E5) : const Color(0xFFE11D48),
+                        ),
+                      ),
+                      Expanded(
+                        child: Text(
+                          motif,
+                          style: const TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFF475569),
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+                const SizedBox(height: 2),
+                Text(subtitle, style: const TextStyle(fontSize: 9.5, color: Color(0xFF94A3B8))),
               ],
             ),
           ),
+          const SizedBox(width: 8),
           Text(
             "${isIncome ? '+' : '-'}${_formatCfa(amount)}",
             style: TextStyle(

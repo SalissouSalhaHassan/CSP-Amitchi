@@ -681,12 +681,13 @@ class UnifiedFinancialReportPdfGenerator {
       border: pw.TableBorder.all(color: lightBorder, width: 0.5),
       columnWidths: const {
         0: pw.FixedColumnWidth(16),
-        1: pw.FixedColumnWidth(42),
-        2: pw.FixedColumnWidth(52),
-        3: pw.FlexColumnWidth(3),
-        4: pw.FlexColumnWidth(1.5),
-        5: pw.FlexColumnWidth(2),
-        6: pw.FlexColumnWidth(2.5),
+        1: pw.FixedColumnWidth(38),
+        2: pw.FixedColumnWidth(44),
+        3: pw.FlexColumnWidth(2.5),
+        4: pw.FlexColumnWidth(1.2),
+        5: pw.FlexColumnWidth(2.2),
+        6: pw.FlexColumnWidth(1.2),
+        7: pw.FlexColumnWidth(2.2),
       },
       children: [
         pw.TableRow(
@@ -697,6 +698,7 @@ class UnifiedFinancialReportPdfGenerator {
             _cellHeaderWhite('Référence', amiriBold, isA5, align: pw.TextAlign.center),
             _cellHeaderWhite(studentLabel, amiriBold, isA5, align: pw.TextAlign.left),
             _cellHeaderWhite(classLabel, amiriBold, isA5, align: pw.TextAlign.center),
+            _cellHeaderWhite('Motif / Description', amiriBold, isA5, align: pw.TextAlign.left),
             _cellHeaderWhite('Mode', amiriBold, isA5, align: pw.TextAlign.center),
             _cellHeaderWhite('Montant Encaissé', amiriBold, isA5, align: pw.TextAlign.right),
           ],
@@ -710,6 +712,7 @@ class UnifiedFinancialReportPdfGenerator {
               _cellData('Aucun encaissement sur cette période', amiriFont, isA5),
               _cellData('-', amiriFont, isA5, align: pw.TextAlign.center),
               _cellData('-', amiriFont, isA5, align: pw.TextAlign.center),
+              _cellData('-', amiriFont, isA5, align: pw.TextAlign.center),
               _cellData(formatCfa(0), amiriBold, isA5, align: pw.TextAlign.right),
             ],
           )
@@ -720,6 +723,10 @@ class UnifiedFinancialReportPdfGenerator {
             final dateStr = p['date']?.toString().split('T')[0] ?? '-';
             final amt = (p['amount'] as num?)?.toDouble() ?? 0.0;
             final isEven = entry.key % 2 == 1;
+            final month = p['monthConcerned']?.toString();
+            final motif = month != null && month.isNotEmpty
+                ? 'Scolarité ($month)'
+                : (p['description']?.toString() ?? p['motif']?.toString() ?? 'Frais scolaires');
 
             return pw.TableRow(
               decoration: isEven ? const pw.BoxDecoration(color: lightBg) : null,
@@ -729,6 +736,7 @@ class UnifiedFinancialReportPdfGenerator {
                 _cellData(p['reference']?.toString() ?? 'REC-${p['id'] ?? ''}', amiriFont, isA5, align: pw.TextAlign.center),
                 _cellData(p['studentName']?.toString() ?? p['title']?.toString() ?? 'Élève', amiriBold, isA5),
                 _cellData(p['classe']?.toString() ?? '-', amiriFont, isA5, align: pw.TextAlign.center),
+                _cellData(motif, amiriFont, isA5),
                 _cellData(p['mode']?.toString() ?? 'Espèces', amiriFont, isA5, align: pw.TextAlign.center),
                 _cellData('+${formatCfa(amt)}', amiriBold, isA5, align: pw.TextAlign.right, color: emeraldGreen),
               ],
@@ -791,13 +799,14 @@ class UnifiedFinancialReportPdfGenerator {
             final dateStr = e['date']?.toString().split('T')[0] ?? '-';
             final amt = (e['amount'] as num?)?.toDouble() ?? 0.0;
             final isEven = entry.key % 2 == 1;
+            final desc = e['description']?.toString() ?? e['title']?.toString() ?? e['category']?.toString() ?? 'Dépense';
 
             return pw.TableRow(
               decoration: isEven ? const pw.BoxDecoration(color: lightBg) : null,
               children: [
                 _cellData('$idx', amiriFont, isA5, align: pw.TextAlign.center),
                 _cellData(dateStr, amiriFont, isA5, align: pw.TextAlign.center),
-                _cellData(e['title']?.toString() ?? 'Dépense', amiriBold, isA5),
+                _cellData(desc, amiriBold, isA5),
                 _cellData(e['category']?.toString() ?? 'Général', amiriFont, isA5, align: pw.TextAlign.center),
                 _cellData(e['paymentMode']?.toString() ?? 'Espèces', amiriFont, isA5, align: pw.TextAlign.center),
                 _cellData('-${formatCfa(amt)}', amiriBold, isA5, align: pw.TextAlign.right, color: roseRed),

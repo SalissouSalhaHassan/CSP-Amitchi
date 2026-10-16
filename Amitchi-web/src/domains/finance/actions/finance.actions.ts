@@ -1563,6 +1563,7 @@ export async function getUnifiedFinancialReport(params?: {
           classe: students.classe,
           educationalLevel: students.educationalLevel,
           sectionName: students.section,
+          monthConcerned: feePayments.monthConcerned,
         })
         .from(feePayments)
         .leftJoin(studentFees, eq(feePayments.feeId, studentFees.id))
@@ -1607,6 +1608,7 @@ export async function getUnifiedFinancialReport(params?: {
           reference: expenses.reference,
           status: expenses.status,
           description: expenses.description,
+          paymentMode: expenses.paymentMode,
         })
         .from(expenses)
         .leftJoin(expenseCategories, eq(expenses.categoryId, expenseCategories.id))
@@ -1756,6 +1758,8 @@ export async function getUnifiedFinancialReport(params?: {
             studentName: p.studentName || "Élève",
             classe: p.classe || "-",
             educationalLevel: p.educationalLevel,
+            monthConcerned: p.monthConcerned,
+            description: p.monthConcerned ? `Scolarité - ${p.monthConcerned}` : "Frais scolaires",
           })),
           recentExpenses: expensesList.slice(0, 50).map((e) => ({
             id: e.id,
@@ -1764,7 +1768,8 @@ export async function getUnifiedFinancialReport(params?: {
             category: e.categoryName || "Général",
             reference: e.reference,
             status: e.status,
-            description: e.description,
+            description: e.description || e.categoryName || "Dépense de fonctionnement",
+            paymentMode: e.paymentMode || "Espèces",
           })),
           allPaymentsCount: paymentsList.length,
           allExpensesCount: expensesList.length,

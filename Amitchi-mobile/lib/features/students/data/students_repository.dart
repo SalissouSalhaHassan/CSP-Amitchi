@@ -125,13 +125,7 @@ class StudentsRepository {
           ),
         };
       }
-      return {
-        'levels': ['Collège', 'Lycée', 'Primaire'],
-        'sections': ['Générale'],
-        'classes': ['6ème A', '5ème A', '4ème A', '3ème A', '2nde A', '1ère A', 'Tle A'],
-        'sessions': ['2026-2027'],
-        'classesDetails': <Map<String, dynamic>>[],
-      };
+      return _buildFallbackFormOptions();
     }
 
     try {
@@ -170,14 +164,109 @@ class StudentsRepository {
       };
     } catch (e) {
       debugPrint('Error fetching student form options: $e');
-      return {
-        'levels': ['Collège', 'Lycée', 'Primaire'],
-        'sections': ['Générale'],
-        'classes': ['6ème A', '5ème A', '4ème A', '3ème A', '2nde A', '1ère A', 'Tle A'],
-        'sessions': ['2026-2027'],
-        'classesDetails': <Map<String, dynamic>>[],
-      };
+      final cached = cacheManager.getDataList(
+        boxName: OfflineStoreManager.boxStudents,
+        key: cacheKey,
+      );
+      if (cached.isNotEmpty && cached.first.containsKey('levels')) {
+        final item = cached.first;
+        return {
+          'levels': List<String>.from(item['levels'] ?? []),
+          'sections': List<String>.from(item['sections'] ?? []),
+          'classes': List<String>.from(item['classes'] ?? []),
+          'sessions': List<String>.from(item['sessions'] ?? ['2026-2027']),
+          'classesDetails': List<Map<String, dynamic>>.from(
+            (item['classesDetails'] as List? ?? []).map((x) => Map<String, dynamic>.from(x)),
+          ),
+        };
+      }
+      return _buildFallbackFormOptions();
     }
+  }
+
+  /// Derives real options from local Hive caches if direct form options cache is missing
+  Map<String, dynamic> _buildFallbackFormOptions() {
+    final cacheManager = locator<OfflineStoreManager>();
+    final Set<String> levels = {};
+    final Set<String> sections = {};
+    final Set<String> classes = {};
+    final Set<String> sessions = {};
+    final List<Map<String, dynamic>> classesDetails = [];
+
+    // 1. Try from cached classes & subjects (OfflineStoreManager.boxClassSubjects)
+    try {
+      final allClassesList = cacheManager.getAllData(boxName: OfflineStoreManager.boxClassSubjects);
+      for (final item in allClassesList) {
+        final cName = item['class_name'] ?? item['className'] ?? item['name'];
+        final sName = item['section_name'] ?? item['sectionName'];
+        final lName = item['educational_level'] ?? item['educationalLevel'] ?? item['level'];
+        if (cName != null && cName.toString().trim().isNotEmpty) {
+          final cStr = cName.toString().trim();
+          classes.add(cStr);
+          classesDetails.add({
+            'id': item['id'],
+            'className': cStr,
+            'sectionName': sName?.toString() ?? '',
+            'educationalLevel': lName?.toString() ?? '',
+            'scolariteMensuelle': item['scolarite_mensuelle'] ?? item['scolariteMensuelle'] ?? 0,
+            'droitsInscription': item['droits_inscription'] ?? item['droitsInscription'] ?? 0,
+            'cogesCarteId': item['coges_carte_id'] ?? item['cogesCarteId'] ?? 0,
+            'transportInternat': item['transport_internat'] ?? item['transportInternat'] ?? 0,
+            'ancienSolde': item['ancien_solde'] ?? item['ancienSolde'] ?? 0,
+            'statutInitial': item['statut_initial'] ?? item['statutInitial'] ?? 'Actif',
+          });
+        }
+        if (sName != null && sName.toString().trim().isNotEmpty) {
+          sections.add(sName.toString().trim());
+        }
+        if (lName != null && lName.toString().trim().isNotEmpty) {
+          levels.add(lName.toString().trim());
+        }
+      }
+    } catch (_) {}
+
+    // 2. Try from cached students list (OfflineStoreManager.boxStudents)
+    try {
+      final cachedStudents = cacheManager.getDataList(
+        boxName: OfflineStoreManager.boxStudents,
+        key: _studentsCacheKey,
+      );
+      for (final s in cachedStudents) {
+        final cName = s['classe']?.toString().trim();
+        final sName = s['section']?.toString().trim();
+        final lName = s['educational_level']?.toString().trim();
+        final sess = s['session']?.toString().trim();
+        if (cName != null && cName.isNotEmpty) classes.add(cName);
+        if (sName != null && sName.isNotEmpty) sections.add(sName);
+        if (lName != null && lName.isNotEmpty) levels.add(lName);
+        if (sess != null && sess.isNotEmpty) sessions.add(sess);
+      }
+    } catch (_) {}
+
+    // 3. Try from cached sessions (OfflineStoreManager.boxSchoolSessions)
+    try {
+      final allSessions = cacheManager.getAllData(boxName: OfflineStoreManager.boxSchoolSessions);
+      for (final s in allSessions) {
+        final sessName = s['session_name'] ?? s['name'] ?? s['session'];
+        if (sessName != null && sessName.toString().trim().isNotEmpty) {
+          sessions.add(sessName.toString().trim());
+        }
+      }
+    } catch (_) {}
+
+    final finalLevels = levels.isNotEmpty ? levels.toList()..sort() : ['Primaire', 'Collège', 'Lycée'];
+    final finalSections = sections.isNotEmpty ? sections.toList()..sort() : ['Générale'];
+    final finalClasses = classes.isNotEmpty ? classes.toList()..sort() : ['6ème A', '5ème A', '4ème A', '3ème A', '2nde A', '1ère A', 'Tle A'];
+    final finalSessions = sessions.isNotEmpty ? sessions.toList() : ['2026-2027'];
+
+    return {
+      'levels': finalLevels,
+      'sections': finalSections,
+      'classes': finalClasses,
+      'sessions': finalSessions,
+      'classesDetails': classesDetails,
+    };
+  }
   }
 
   Future<Map<String, dynamic>> saveStudent({

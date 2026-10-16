@@ -508,19 +508,21 @@ export function UnifiedFinancialReportView({
 
       // ── SECTION: RECENT TRANSACTIONS JOURNAL TABLE ──
       const payList = reportData?.transactions?.recentPayments || [];
+      const expList = reportData?.transactions?.recentExpenses || [];
       const studentLabel = isHigherEd ? "Étudiant" : "Élève";
       const classLabel = isHigherEd ? "Filière" : "Classe";
       const paymentRows = payList.length > 0
-        ? payList.slice(0, 25).map((p: any, idx: number) => [
+        ? payList.slice(0, 20).map((p: any, idx: number) => [
             String(idx + 1),
             formatDateDisplay(p.date),
             p.reference || "-",
             p.studentName || studentLabel,
             p.classe || "-",
+            p.monthConcerned ? `Scolarité (${p.monthConcerned})` : (p.description || "Frais scolaires"),
             p.mode || "Espèces",
             `+${formatCfa(p.amount || 0)}`,
           ])
-        : [["-", "-", "-", "Aucune transaction enregistrée", "-", "-", "0 CFA"]];
+        : [["-", "-", "-", "Aucune transaction enregistrée", "-", "-", "-", "0 CFA"]];
 
       doc.setFont("helvetica", "bold");
       doc.setFontSize(8.5);
@@ -529,24 +531,65 @@ export function UnifiedFinancialReportView({
 
       autoTable(doc, {
         startY: nextY + 3,
-        head: [["N°", "Date", "Référence", studentLabel, classLabel, "Mode", "Montant Encaissé"]],
+        head: [["N°", "Date", "Référence", studentLabel, classLabel, "Motif / Description", "Mode", "Montant Encaissé"]],
         body: paymentRows,
         margin: { left: margin, right: margin },
-        styles: { fontSize: 7, cellPadding: 2.2 },
+        styles: { fontSize: 6.8, cellPadding: 2 },
         headStyles: { fillColor: [15, 23, 42], textColor: 255, fontStyle: "bold" },
         columnStyles: {
-          0: { cellWidth: 8, halign: "center" },
-          1: { cellWidth: 24, halign: "center" },
-          2: { cellWidth: 28, font: "courier", halign: "center" },
-          3: { cellWidth: 44, fontStyle: "bold" },
-          4: { cellWidth: 26 },
-          5: { cellWidth: 20, halign: "center" },
-          6: { cellWidth: 32, halign: "right", fontStyle: "bold", textColor: [22, 101, 52] },
+          0: { cellWidth: 7, halign: "center" },
+          1: { cellWidth: 20, halign: "center" },
+          2: { cellWidth: 24, font: "courier", halign: "center" },
+          3: { cellWidth: 38, fontStyle: "bold" },
+          4: { cellWidth: 18 },
+          5: { cellWidth: 42 },
+          6: { cellWidth: 18, halign: "center" },
+          7: { cellWidth: 27, halign: "right", fontStyle: "bold", textColor: [22, 101, 52] },
         },
       });
 
+      let currentTableBottom = (doc as any).lastAutoTable.finalY;
+
+      // Table des Dépenses Récentes avec Motif / Description dans le PDF si disponibles
+      if (expList.length > 0) {
+        const expStartY = currentTableBottom + 6;
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(8.5);
+        doc.setTextColor(15, 23, 42);
+        doc.text("EXTRAIT DU JOURNAL DES CHARGES & DÉPENSES (SORTIES)", margin, expStartY);
+
+        const expRows = expList.slice(0, 15).map((e: any, idx: number) => [
+          String(idx + 1),
+          formatDateDisplay(e.date),
+          e.reference || "-",
+          e.category || "Général",
+          e.description || e.category || "Dépense",
+          e.paymentMode || "Espèces",
+          `-${formatCfa(e.amount || 0)}`,
+        ]);
+
+        autoTable(doc, {
+          startY: expStartY + 3,
+          head: [["N°", "Date", "Référence", "Catégorie", "Motif / Description", "Mode", "Montant Dépensé"]],
+          body: expRows,
+          margin: { left: margin, right: margin },
+          styles: { fontSize: 6.8, cellPadding: 2 },
+          headStyles: { fillColor: [159, 18, 57], textColor: 255, fontStyle: "bold" },
+          columnStyles: {
+            0: { cellWidth: 7, halign: "center" },
+            1: { cellWidth: 20, halign: "center" },
+            2: { cellWidth: 24, font: "courier", halign: "center" },
+            3: { cellWidth: 30 },
+            4: { cellWidth: 50, fontStyle: "bold" },
+            5: { cellWidth: 22, halign: "center" },
+            6: { cellWidth: 32, halign: "right", fontStyle: "bold", textColor: [159, 18, 57] },
+          },
+        });
+        currentTableBottom = (doc as any).lastAutoTable.finalY;
+      }
+
       // Signatures & Official Stamp Footer
-      const finalTableY = (doc as any).lastAutoTable.finalY;
+      const finalTableY = currentTableBottom;
       const signY = Math.min(finalTableY + 8, H - 35);
 
       doc.setDrawColor(226, 232, 240);
@@ -926,14 +969,19 @@ export function UnifiedFinancialReportView({
               ) : (
                 reportData?.transactions?.recentPayments.slice(0, 20).map((p: any) => (
                   <div key={p.id} className="p-3 flex items-center justify-between text-xs hover:bg-slate-50/60 dark:hover:bg-slate-900/30 print:p-1.5 print:text-[10px]">
-                    <div>
-                      <div className="font-bold text-slate-800 dark:text-slate-200">{p.studentName}</div>
-                      <div className="text-[10px] text-slate-400 print:text-[8px]">
-                        {p.classe} • {p.mode} • {formatDateDisplay(p.date)}
+                    <div className="flex-1 pr-2">
+                      <div className="flex items-center justify-between">
+                        <span className="font-bold text-slate-800 dark:text-slate-200">{p.studentName}</span>
+                        <span className="font-mono font-black text-emerald-600 dark:text-emerald-400">
+                          +{formatCfa(p.amount)}
+                        </span>
                       </div>
-                    </div>
-                    <div className="font-mono font-black text-emerald-600 dark:text-emerald-400">
-                      +{formatCfa(p.amount)}
+                      <div className="text-[10px] text-slate-500 dark:text-slate-400 font-medium mt-0.5 print:text-[8px]">
+                        <span className="font-bold text-indigo-600 dark:text-indigo-400">Motif :</span> {p.monthConcerned ? `Scolarité (${p.monthConcerned})` : (p.description || "Frais scolaires")}
+                      </div>
+                      <div className="text-[9px] text-slate-400 print:text-[7.5px] mt-0.5">
+                        {p.classe} • {p.mode} • {p.reference || "-"} • {formatDateDisplay(p.date)}
+                      </div>
                     </div>
                   </div>
                 ))
@@ -952,14 +1000,19 @@ export function UnifiedFinancialReportView({
               ) : (
                 reportData?.transactions?.recentExpenses.slice(0, 20).map((e: any) => (
                   <div key={e.id} className="p-3 flex items-center justify-between text-xs hover:bg-slate-50/60 dark:hover:bg-slate-900/30 print:p-1.5 print:text-[10px]">
-                    <div>
-                      <div className="font-bold text-slate-800 dark:text-slate-200">{e.category}</div>
-                      <div className="text-[10px] text-slate-400 truncate max-w-[200px] print:text-[8px]">
-                        {e.description || e.reference} • {formatDateDisplay(e.date)}
+                    <div className="flex-1 pr-2">
+                      <div className="flex items-center justify-between">
+                        <span className="font-bold text-slate-800 dark:text-slate-200">{e.category}</span>
+                        <span className="font-mono font-black text-rose-600 dark:text-rose-400">
+                          -{formatCfa(e.amount)}
+                        </span>
                       </div>
-                    </div>
-                    <div className="font-mono font-black text-rose-600 dark:text-rose-400">
-                      -{formatCfa(e.amount)}
+                      <div className="text-[10px] text-slate-500 dark:text-slate-400 font-medium mt-0.5 print:text-[8px]">
+                        <span className="font-bold text-rose-600 dark:text-rose-400">Motif :</span> {e.description || e.category || "Dépense"}
+                      </div>
+                      <div className="text-[9px] text-slate-400 print:text-[7.5px] mt-0.5">
+                        {e.reference || "-"} • {e.paymentMode || "Espèces"} • {formatDateDisplay(e.date)}
+                      </div>
                     </div>
                   </div>
                 ))

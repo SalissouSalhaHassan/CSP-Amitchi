@@ -180,6 +180,12 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
           final session = locator<SessionManager>();
           final hasPin = await session.hasOfflinePin();
           final role = await session.getRole() ?? 'staff';
+          
+          // Prime offline cache immediately in the background upon successful login
+          try {
+            locator<SyncEngine>().preloadAllOfflineData();
+          } catch (_) {}
+
           if (!mounted) return;
           if (!hasPin) {
             // Suggest creating an offline PIN for seamless offline access

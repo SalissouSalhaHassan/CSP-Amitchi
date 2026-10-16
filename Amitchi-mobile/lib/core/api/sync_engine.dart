@@ -280,6 +280,7 @@ class SyncEngine {
 
       await Future.wait<dynamic>([
         locator<StudentsRepository>().getStudentsList().catchError((_) => <Map<String, dynamic>>[]),
+        locator<StudentsRepository>().getStudentFormOptions().catchError((_) => <String, dynamic>{}),
         locator<DashboardStatsRepository>().getSummary().catchError((_) => <String, dynamic>{}),
         locator<AcademicsRepository>().getSessions(schoolId).catchError((_) => <Map<String, dynamic>>[]),
         locator<AcademicsRepository>().getPeriods(schoolId, sessionId).catchError((_) => <Map<String, dynamic>>[]),
