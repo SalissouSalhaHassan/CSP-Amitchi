@@ -92,8 +92,8 @@ class MobileApiClient {
             Dio(
               BaseOptions(
                 baseUrl: MobileApiConfig.baseUrl,
-                connectTimeout: const Duration(seconds: 30),
-                receiveTimeout: const Duration(seconds: 45),
+                connectTimeout: const Duration(seconds: 4),
+                receiveTimeout: const Duration(seconds: 8),
               ),
             ),
         _supabaseClient = supabaseClient ?? SupabaseClientManager().client,

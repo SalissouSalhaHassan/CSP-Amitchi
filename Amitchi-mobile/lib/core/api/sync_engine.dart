@@ -37,8 +37,8 @@ class SyncEngine {
         _queueManager = queueManager ?? locator<OfflineQueueManager>();
 
   /// Start monitoring connectivity and trigger auto-sync
-  void start() {
-    _checkInitialConnection();
+  Future<void> start() async {
+    await _checkInitialConnection();
     _subscription = _connectivity.onConnectivityChanged.listen(_handleConnectionChange);
     
     // Load last sync time

@@ -22,8 +22,8 @@ void main() async {
   // Initialize dependency injection & Supabase
   await setupLocator();
 
-  // Start Offline Sync Engine
-  locator<SyncEngine>().start();
+  // Start Offline Sync Engine and detect connectivity immediately
+  await locator<SyncEngine>().start();
 
   // Initialize Mobile Push Notifications Service
   await locator<MobilePushNotificationService>().initialize();

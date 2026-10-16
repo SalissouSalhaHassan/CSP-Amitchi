@@ -315,7 +315,7 @@ class StudentsRepository {
         priority: 1,
       );
 
-      // Optimistic update in Hive
+      // Optimistic update in Hive students list
       final currentList = cacheManager.getDataList(
         boxName: OfflineStoreManager.boxStudents,
         key: _studentsCacheKey,
@@ -326,6 +326,9 @@ class StudentsRepository {
         key: _studentsCacheKey,
         data: currentList,
       );
+
+      // Optimistically insert into Gestion Financière cache
+      await _createOptimisticFeeForStudent(dataToSend, localTempId);
 
       return {
         'success': true,
@@ -357,12 +360,104 @@ class StudentsRepository {
         priority: 1,
       );
 
+      // Optimistic update in Hive students list
+      final currentList = cacheManager.getDataList(
+        boxName: OfflineStoreManager.boxStudents,
+        key: _studentsCacheKey,
+      );
+      currentList.insert(0, dataToSend);
+      await cacheManager.saveDataList(
+        boxName: OfflineStoreManager.boxStudents,
+        key: _studentsCacheKey,
+        data: currentList,
+      );
+
+      // Optimistically insert into Gestion Financière cache
+      await _createOptimisticFeeForStudent(dataToSend, localTempId);
+
       return {
         'success': true,
         'isOffline': true,
         'localId': localTempId,
         'message': 'Connexion instable. Élève mis en file d\'attente de synchronisation.',
       };
+    }
+  }
+
+  Future<void> _createOptimisticFeeForStudent(Map<String, dynamic> studentData, dynamic studentId) async {
+    try {
+      if (!Hive.isBoxOpen(OfflineStoreManager.boxStudentFees)) {
+        await Hive.openBox(OfflineStoreManager.boxStudentFees);
+      }
+      final box = Hive.box(OfflineStoreManager.boxStudentFees);
+
+      final monthly = (studentData['frais_mensuels'] as num?)?.toDouble() ??
+          double.tryParse(studentData['frais_mensuels']?.toString() ?? '') ?? 0.0;
+      final registration = (studentData['frais_inscription'] as num?)?.toDouble() ??
+          double.tryParse(studentData['frais_inscription']?.toString() ?? '') ?? 0.0;
+      final coges = (studentData['frais_coges_card'] as num?)?.toDouble() ??
+          double.tryParse(studentData['frais_coges_card']?.toString() ?? '') ?? 1500.0;
+      final transport = (studentData['frais_transport_internat'] as num?)?.toDouble() ??
+          double.tryParse(studentData['frais_transport_internat']?.toString() ?? '') ?? 0.0;
+      final prevBalance = (studentData['ancien_solde'] as num?)?.toDouble() ??
+          double.tryParse(studentData['ancien_solde']?.toString() ?? '') ?? 0.0;
+
+      final totalExpected = (monthly * 9.0) + registration + coges + transport + prevBalance;
+      final feeId = DateTime.now().millisecondsSinceEpoch;
+
+      final feeRecord = <String, dynamic>{
+        'id': feeId,
+        'student_id': studentId,
+        'school_id': 1,
+        'session_id': 16,
+        'total_expected': totalExpected > 0 ? totalExpected : 45000.0,
+        'total_paid': 0.0,
+        'total_reduction': 0.0,
+        'balance': totalExpected > 0 ? totalExpected : 45000.0,
+        'status': 'Impayé',
+        'is_offline_draft': true,
+        'students': {
+          'id': studentId,
+          'nom_etudiant': studentData['nom_etudiant'] ?? 'Nouvel Élève',
+          'num_admission': studentData['num_admission'] ?? 'AM-2026-TEMP',
+          'classe': studentData['classe'] ?? '',
+          'educational_level': studentData['educational_level'] ?? '',
+          'section': studentData['section'] ?? '',
+          'mobile': studentData['mobile'] ?? '',
+          'nom_pere': studentData['nom_pere'] ?? '',
+        },
+      };
+
+      // Find all student_fees keys in boxStudentFees and prepend new student fee
+      final feeKeys = box.keys.map((k) => k.toString()).where((k) => k.startsWith('student_fees_')).toList();
+      if (feeKeys.isEmpty) {
+        feeKeys.add('student_fees_1_16');
+        feeKeys.add('student_fees_1_1');
+      }
+
+      for (final key in feeKeys) {
+        final existingRaw = box.get(key);
+        final list = (existingRaw is List)
+            ? existingRaw.map((e) => Map<String, dynamic>.from(e as Map)).toList()
+            : <Map<String, dynamic>>[];
+        list.insert(0, feeRecord);
+        await box.put(key, list);
+
+        // Update corresponding stats key
+        final statsKey = key.replaceFirst('student_fees_', 'finance_stats_');
+        final currentStatsList = box.get(statsKey);
+        if (currentStatsList is List && currentStatsList.isNotEmpty && currentStatsList.first is Map) {
+          final statsMap = Map<String, dynamic>.from(currentStatsList.first as Map);
+          final innerStats = statsMap['stats'] is Map ? Map<String, dynamic>.from(statsMap['stats'] as Map) : <String, dynamic>{};
+          innerStats['totalExpected'] = ((innerStats['totalExpected'] as num?)?.toDouble() ?? 0.0) + (feeRecord['total_expected'] as double);
+          innerStats['totalDebts'] = ((innerStats['totalDebts'] as num?)?.toDouble() ?? 0.0) + (feeRecord['balance'] as double);
+          statsMap['stats'] = innerStats;
+          await box.put(statsKey, [statsMap]);
+        }
+      }
+      debugPrint("✅ Optimistic fee generated and cached for student $studentId across keys: $feeKeys");
+    } catch (e) {
+      debugPrint("⚠️ Warning generating optimistic student fee: $e");
     }
   }
 

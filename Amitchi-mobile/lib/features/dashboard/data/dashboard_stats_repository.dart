@@ -58,16 +58,34 @@ class DashboardStatsRepository {
     );
     final activeStudentsCount = cachedStudents.length;
 
-    final cachedClasses = cacheManager.getDataList(
-      boxName: OfflineStoreManager.boxClassSubjects,
-      key: "all_classes_1",
-    );
+    var activeClassesCount = 0;
+    if (Hive.isBoxOpen(OfflineStoreManager.boxClassSubjects)) {
+      final box = Hive.box(OfflineStoreManager.boxClassSubjects);
+      for (final k in box.keys) {
+        if (k.toString().startsWith('all_classes_')) {
+          final list = box.get(k);
+          if (list is List && list.isNotEmpty) {
+            activeClassesCount = list.length;
+            break;
+          }
+        }
+      }
+    }
+
+    if (activeClassesCount == 0 && cachedStudents.isNotEmpty) {
+      final uniqueClasses = cachedStudents
+          .map((s) => s['classe']?.toString())
+          .whereType<String>()
+          .where((s) => s.isNotEmpty)
+          .toSet();
+      activeClassesCount = uniqueClasses.length;
+    }
 
     return {
       'totalStudents': activeStudentsCount,
       'activeStudents': activeStudentsCount,
       'newStudentsThisMonth': 0,
-      'activeClasses': cachedClasses.length,
+      'activeClasses': activeClassesCount > 0 ? activeClassesCount : 1,
       'attendanceRate': 95,
       'teacherAttendanceRate': 98,
       'activeExamsCount': 0,
