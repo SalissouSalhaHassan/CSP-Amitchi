@@ -240,37 +240,25 @@ class UnifiedFinancialReportPdfGenerator {
                   else
                     pw.Container(width: isA5 ? 36 : 46, height: isA5 ? 36 : 46),
 
-                  // Right (Arabic)
+                  // Right (Session & Period Info - Matching Web without Arabic)
                   pw.Expanded(
                     flex: 4,
                     child: pw.Column(
                       crossAxisAlignment: pw.CrossAxisAlignment.end,
                       children: [
                         pw.Text(
-                          countryAr,
-                          textDirection: pw.TextDirection.rtl,
-                          style: pw.TextStyle(font: amiriBold, fontSize: isA5 ? 7 : 8.5, color: darkNavy),
+                          'SESSION : $activeSession',
+                          style: pw.TextStyle(font: amiriBold, fontSize: isA5 ? 6.5 : 8, color: primaryIndigo),
                         ),
+                        pw.SizedBox(height: 3),
                         pw.Text(
-                          ministryAr,
-                          textDirection: pw.TextDirection.rtl,
-                          style: pw.TextStyle(font: amiriFont, fontSize: isA5 ? 5.5 : 7, color: greyColor),
+                          'Édité le : $datePrinted',
+                          style: pw.TextStyle(font: amiriFont, fontSize: isA5 ? 5.5 : 6.8, color: greyColor),
                         ),
                         pw.SizedBox(height: 2),
                         pw.Text(
-                          schoolAr,
-                          textDirection: pw.TextDirection.rtl,
-                          style: pw.TextStyle(font: amiriBold, fontSize: isA5 ? 8 : 10, color: darkNavy),
-                        ),
-                        if (serviceAr.isNotEmpty)
-                          pw.Text(
-                            serviceAr,
-                            textDirection: pw.TextDirection.rtl,
-                            style: pw.TextStyle(font: amiriFont, fontSize: isA5 ? 5.5 : 6.5, color: greyColor),
-                          ),
-                        pw.Text(
-                          'SESSION : $activeSession',
-                          style: pw.TextStyle(font: amiriBold, fontSize: isA5 ? 5.5 : 6.5, color: primaryIndigo),
+                          getPeriodLabel(period, selectedDate),
+                          style: pw.TextStyle(font: amiriBold, fontSize: isA5 ? 5.5 : 6.8, color: darkNavy),
                         ),
                       ],
                     ),

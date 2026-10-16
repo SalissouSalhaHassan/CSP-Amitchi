@@ -576,6 +576,56 @@ class _UnifiedFinancialReportScreenState
                       const SizedBox(height: 12),
                     ],
 
+                    // OFFICIAL INSTITUTION HEADER CARD (MATCHING WEB)
+                    _buildOfficialHeaderCard(),
+                    const SizedBox(height: 12),
+
+                    // TITLE BANNER (RAPPORT FINANCIER UNIFIÉ)
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          colors: [Color(0xFF2563EB), Color(0xFF4F46E5)],
+                          begin: Alignment.centerLeft,
+                          end: Alignment.centerRight,
+                        ),
+                        borderRadius: BorderRadius.circular(16),
+                        boxShadow: [
+                          BoxShadow(
+                            color: const Color(0xFF4F46E5).withOpacity(0.2),
+                            blurRadius: 8,
+                            offset: const Offset(0, 3),
+                          ),
+                        ],
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            "RAPPORT FINANCIER UNIFIÉ (RECETTES VS DÉPENSES)",
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w900,
+                              fontSize: 13,
+                              letterSpacing: 0.5,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            UnifiedFinancialReportPdfGenerator.getPeriodLabel(_period, _selectedDate).toUpperCase(),
+                            style: const TextStyle(
+                              color: Color(0xFFDBEAFE),
+                              fontWeight: FontWeight.bold,
+                              fontSize: 11,
+                              letterSpacing: 0.3,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+
                     // 4 SUMMARY CARDS
                     _buildKpiCard(
                       title: "Recettes Encaissées",
@@ -899,6 +949,130 @@ class _UnifiedFinancialReportScreenState
         msg,
         textAlign: TextAlign.center,
         style: const TextStyle(fontSize: 11, color: Color(0xFF94A3B8)),
+      ),
+    );
+  }
+
+  Widget _buildOfficialHeaderCard() {
+    final resolvedHeader = EducationalLevelHelper.getActiveLevelHeaderConfig(
+      _headerConfig,
+      targetLevel: _effectiveTargetLevel,
+    );
+
+    final country = resolvedHeader['country']?.toString() ?? 'RÉPUBLIQUE DU NIGER';
+    final ministry = resolvedHeader['ministry']?.toString() ?? 'Ministère de l\'Éducation Nationale';
+    final school = resolvedHeader['schoolName']?.toString() ?? 'ÉCOLE EXCELLENCE';
+    final service = resolvedHeader['service']?.toString() ?? 'Service de la Scolarité';
+    final address = resolvedHeader['address']?.toString() ?? 'Niamey, Niger';
+    final phone = resolvedHeader['phone']?.toString() ?? resolvedHeader['schoolPhone']?.toString() ?? '+227 90 00 00 00';
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.02),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      country.toUpperCase(),
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w900,
+                        color: Color(0xFF0F172A),
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      ministry,
+                      style: const TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w500,
+                        color: Color(0xFF475569),
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      school.toUpperCase(),
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w900,
+                        color: Color(0xFF0F172A),
+                      ),
+                    ),
+                    if (service.isNotEmpty) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        service,
+                        style: const TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w500,
+                          color: Color(0xFF64748B),
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: 2),
+                    Text(
+                      "$address | Tél: $phone",
+                      style: const TextStyle(
+                        fontSize: 9.5,
+                        color: Color(0xFF64748B),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFEEF2FF),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: const Color(0xFFC7D2FE)),
+                    ),
+                    child: Text(
+                      "SESSION : $_sessionName",
+                      style: const TextStyle(
+                        fontSize: 9.5,
+                        fontWeight: FontWeight.w900,
+                        color: Color(0xFF4F46E5),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    "Édité le : ${DateFormat('dd/MM/yyyy').format(DateTime.now())}",
+                    style: const TextStyle(
+                      fontSize: 9,
+                      fontWeight: FontWeight.w500,
+                      color: Color(0xFF94A3B8),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
