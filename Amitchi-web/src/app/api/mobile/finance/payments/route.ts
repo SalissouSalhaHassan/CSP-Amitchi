@@ -58,7 +58,6 @@ export async function GET(request: NextRequest) {
           classe: students.classe,
           educational_level: students.educationalLevel,
           section: students.section,
-          filiere: students.filiere,
           fee_status: studentFees.status,
           total_expected: studentFees.totalExpected,
           balance: studentFees.balance,
@@ -85,7 +84,6 @@ export async function GET(request: NextRequest) {
               educationalLevel: p.educational_level,
               classe: p.classe,
               sectionName: p.section,
-              filiere: p.filiere,
             },
             activeLevel
           );
@@ -109,7 +107,7 @@ export async function GET(request: NextRequest) {
         classe: p.classe || "-",
         educational_level: p.educational_level || "",
         section: p.section || "",
-        filiere: p.filiere || "",
+        filiere: "",
         fee_status: p.fee_status || "Soldé",
         total_expected: Number(p.total_expected) || 0,
         balance: Number(p.balance) || 0,
