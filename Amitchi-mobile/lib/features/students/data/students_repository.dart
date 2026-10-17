@@ -405,10 +405,16 @@ class StudentsRepository {
       final totalExpected = (monthly * 9.0) + registration + coges + transport + prevBalance;
       final feeId = DateTime.now().millisecondsSinceEpoch;
 
+      final session = locator<SessionManager>();
+      final sessionSchoolIdStr = await session.getSchoolId();
+      final effectiveSchoolId = (sessionSchoolIdStr != null && int.tryParse(sessionSchoolIdStr) != null)
+          ? int.parse(sessionSchoolIdStr)
+          : (studentData['school_id'] as int? ?? 1);
+
       final feeRecord = <String, dynamic>{
         'id': feeId,
         'student_id': studentId,
-        'school_id': 1,
+        'school_id': effectiveSchoolId,
         'session_id': 16,
         'total_expected': totalExpected > 0 ? totalExpected : 45000.0,
         'total_paid': 0.0,

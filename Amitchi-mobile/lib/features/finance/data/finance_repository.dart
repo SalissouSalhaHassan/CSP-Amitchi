@@ -736,13 +736,19 @@ class FinanceRepository {
     }
 
     try {
+      final session = locator<SessionManager>();
+      final sessionSchoolIdStr = await session.getSchoolId();
+      final effectiveSchoolId = (sessionSchoolIdStr != null && int.tryParse(sessionSchoolIdStr) != null)
+          ? int.parse(sessionSchoolIdStr)
+          : (schoolId > 0 ? schoolId : 1);
+
       final response = await _apiClient.postJson(
         '/api/mobile/finance/payments',
         {
           'action': 'recordPayment',
           'payload': {
             'feeId': feeId,
-            'schoolId': schoolId,
+            'schoolId': effectiveSchoolId,
             'amount': amount,
             'reduction': reduction,
             'paymentMode': paymentMode,

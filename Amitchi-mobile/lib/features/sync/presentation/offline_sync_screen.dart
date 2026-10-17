@@ -606,36 +606,63 @@ class _OfflineSyncScreenState extends State<OfflineSyncScreen> {
                           ),
                         ],
                       ),
-                      TextButton.icon(
-                        style: TextButton.styleFrom(
-                          foregroundColor: const Color(0xFFDC2626),
-                          visualDensity: VisualDensity.compact,
-                        ),
-                        onPressed: () async {
-                          final confirm = await showDialog<bool>(
-                            context: context,
-                            builder: (ctx) => AlertDialog(
-                              title: const Text('Purger les erreurs ?'),
-                              content: const Text('Voulez-vous supprimer définitivement toutes les opérations en échec ?'),
-                              actions: [
-                                TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Annuler')),
-                                TextButton(
-                                  style: TextButton.styleFrom(foregroundColor: const Color(0xFFDC2626)),
-                                  onPressed: () => Navigator.pop(ctx, true),
-                                  child: const Text('Tout Purger'),
-                                ),
-                              ],
+                      Wrap(
+                        spacing: 4,
+                        children: [
+                          TextButton.icon(
+                            style: TextButton.styleFrom(
+                              foregroundColor: const Color(0xFF0284C7),
+                              visualDensity: VisualDensity.compact,
                             ),
-                          );
-                          if (confirm == true) {
-                            for (final entry in dlqEntries) {
-                              await _queueManager.deleteDeadLetter(entry.key);
-                            }
-                            if (mounted) setState(() {});
-                          }
-                        },
-                        icon: const Icon(Icons.clear_all_rounded, size: 16),
-                        label: const Text('Tout purger', style: TextStyle(fontSize: 12)),
+                            onPressed: () async {
+                              for (final entry in dlqEntries) {
+                                await _queueManager.retryDeadLetter(entry.key);
+                              }
+                              if (mounted) {
+                                setState(() {});
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text('${dlqEntries.length} opération(s) réintégrée(s) dans la file d\'attente.'),
+                                    backgroundColor: const Color(0xFF0284C7),
+                                  ),
+                                );
+                              }
+                            },
+                            icon: const Icon(Icons.replay_rounded, size: 16),
+                            label: const Text('Tout réinjecter', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                          ),
+                          TextButton.icon(
+                            style: TextButton.styleFrom(
+                              foregroundColor: const Color(0xFFDC2626),
+                              visualDensity: VisualDensity.compact,
+                            ),
+                            onPressed: () async {
+                              final confirm = await showDialog<bool>(
+                                context: context,
+                                builder: (ctx) => AlertDialog(
+                                  title: const Text('Purger les erreurs ?'),
+                                  content: const Text('Voulez-vous supprimer définitivement toutes les opérations en échec ?'),
+                                  actions: [
+                                    TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Annuler')),
+                                    TextButton(
+                                      style: TextButton.styleFrom(foregroundColor: const Color(0xFFDC2626)),
+                                      onPressed: () => Navigator.pop(ctx, true),
+                                      child: const Text('Tout Purger'),
+                                    ),
+                                  ],
+                                ),
+                              );
+                              if (confirm == true) {
+                                for (final entry in dlqEntries) {
+                                  await _queueManager.deleteDeadLetter(entry.key);
+                                }
+                                if (mounted) setState(() {});
+                              }
+                            },
+                            icon: const Icon(Icons.clear_all_rounded, size: 16),
+                            label: const Text('Tout purger', style: TextStyle(fontSize: 12)),
+                          ),
+                        ],
                       ),
                     ],
                   ),

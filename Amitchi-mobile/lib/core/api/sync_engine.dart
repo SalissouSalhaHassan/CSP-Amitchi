@@ -567,6 +567,86 @@ class SyncEngine {
         return (success: false, error: err, isBusinessError: isBiz);
       }
 
+      if (op.table == 'students' && (op.action == 'create_student' || op.action == 'saveStudent')) {
+        final client = locator.isRegistered<MobileApiClient>()
+            ? locator<MobileApiClient>()
+            : MobileApiClient();
+
+        final dataToSend = Map<String, dynamic>.from(op.data);
+        final localTempId = dataToSend['localId']?.toString() ?? dataToSend['id']?.toString();
+
+        // 1. Try dedicated student API endpoint first
+        try {
+          final res = await client.postJson('/api/mobile/students', {
+            'action': 'saveStudent',
+            'payload': dataToSend,
+          });
+
+          if (res['success'] == true) {
+            final realId = (res['data'] is Map ? res['data']['id'] : null) ?? res['studentId'];
+            if (localTempId != null && realId != null) {
+              await _queueManager.remapTemporaryId(
+                temporaryId: localTempId,
+                permanentId: realId,
+              );
+            }
+            debugPrint("✅ SyncEngine: Student $localTempId successfully synced via /api/mobile/students");
+            return (success: true, error: null, isBusinessError: false);
+          }
+        } catch (postErr) {
+          debugPrint("⚠️ /api/mobile/students sync attempt failed, trying /api/mobile/sync: $postErr");
+        }
+
+        // 2. Fallback to /api/mobile/sync with normalized payload
+        final syncData = Map<String, dynamic>.from(dataToSend);
+        syncData['numAdmission'] = dataToSend['num_admission'] ?? dataToSend['numAdmission'];
+        syncData['nomEtudiant'] = dataToSend['nom_etudiant'] ?? dataToSend['nomEtudiant'];
+        syncData['nomArabe'] = dataToSend['nom_arabe'] ?? dataToSend['nomArabe'];
+        syncData['dateNaissance'] = dataToSend['date_naissance'] ?? dataToSend['dateNaissance'];
+        syncData['lieuNaissance'] = dataToSend['lieu_naissance'] ?? dataToSend['lieuNaissance'];
+        syncData['nomPere'] = dataToSend['nom_pere'] ?? dataToSend['nomPere'];
+        syncData['educationalLevel'] = dataToSend['educational_level'] ?? dataToSend['educationalLevel'];
+        syncData['fraisInscription'] = dataToSend['frais_inscription'] ?? dataToSend['fraisInscription'];
+        syncData['fraisMensuels'] = dataToSend['frais_mensuels'] ?? dataToSend['fraisMensuels'];
+        syncData['photoPath'] = dataToSend['photo_path'] ?? dataToSend['photoPath'];
+
+        try {
+          final syncRes = await client.postJson('/api/mobile/sync', {
+            'table': 'students',
+            'action': 'create_student',
+            'data': syncData,
+            'id': op.id,
+            'timestamp': op.timestamp,
+            'idempotencyKey': op.idempotencyKey,
+          });
+
+          if (syncRes['success'] == true) {
+            final results = syncRes['results'] as List?;
+            if (results != null && results.isNotEmpty) {
+              for (final r in results) {
+                final localId = r['localId']?.toString();
+                final realId = r['realId'];
+                if (localId != null && realId != null) {
+                  await _queueManager.remapTemporaryId(
+                    temporaryId: localId,
+                    permanentId: realId,
+                  );
+                }
+              }
+            }
+            debugPrint("✅ SyncEngine: Student $localTempId successfully synced via /api/mobile/sync");
+            return (success: true, error: null, isBusinessError: false);
+          }
+
+          final errMsg = syncRes['error']?.toString() ?? "Échec d'enregistrement de l'étudiant sur le serveur";
+          final isBiz = errMsg.contains("Accès refusé") || errMsg.contains("doublon") || errMsg.contains("existe déjà");
+          return (success: false, error: errMsg, isBusinessError: isBiz);
+        } catch (syncErr) {
+          final msg = syncErr.toString();
+          return (success: false, error: msg, isBusinessError: false);
+        }
+      }
+
       final success = await _replayOperation(op);
       return (success: success, error: success ? null : "Échec de rejeu", isBusinessError: false);
     } catch (e) {
