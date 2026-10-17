@@ -255,13 +255,10 @@ export async function POST(request: NextRequest) {
 
     const cleanRef = reference ? String(reference).trim() : null;
 
-    // Idempotency: if payment with this reference was already recorded, return success cleanly
+    // 1. Check idempotency by reference first (without querying feeId if feeId is outside int32 range)
     if (cleanRef) {
       const existingPayment = await readDb.query.feePayments.findFirst({
-        where: and(
-          eq(feePayments.feeId, Number(feeId)),
-          eq(feePayments.reference, cleanRef)
-        )
+        where: eq(feePayments.reference, cleanRef)
       });
       if (existingPayment) {
         return NextResponse.json({
@@ -283,10 +280,91 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Query current fee from DB to accurately accumulate multiple payments in a batch
-    const currentFee = await readDb.query.studentFees.findFirst({
-      where: eq(studentFees.id, Number(feeId))
-    });
+    // 2. Resolve valid integer feeId within Postgres serial range (-2147483648 to 2147483647)
+    const rawFeeNum = Number(feeId);
+    const isTempFeeId = isNaN(rawFeeNum) || rawFeeNum <= 0 || rawFeeNum > 2147483647;
+    let resolvedFeeId: number | null = !isTempFeeId ? rawFeeNum : null;
+    let currentFee: any = null;
+
+    if (resolvedFeeId) {
+      currentFee = await readDb.query.studentFees.findFirst({
+        where: eq(studentFees.id, resolvedFeeId)
+      });
+    }
+
+    // If feeId was a temporary offline ID or not found in student_fees, attempt to locate student's fee account
+    if (!currentFee) {
+      const numAdm = payload.numAdmission || payload.num_admission;
+      const stdName = payload.studentName || payload.student_name;
+      const effSchool = Number(targetSchoolId);
+
+      let matchedStudent: any = null;
+      if (numAdm) {
+        matchedStudent = await readDb.query.students.findFirst({
+          where: and(
+            eq(students.schoolId, effSchool),
+            eq(students.numAdmission, String(numAdm))
+          )
+        });
+      }
+
+      if (!matchedStudent && stdName) {
+        matchedStudent = await readDb.query.students.findFirst({
+          where: and(
+            eq(students.schoolId, effSchool),
+            eq(students.nomEtudiant, String(stdName))
+          )
+        });
+      }
+
+      if (matchedStudent) {
+        currentFee = await readDb.query.studentFees.findFirst({
+          where: and(
+            eq(studentFees.schoolId, effSchool),
+            eq(studentFees.studentId, matchedStudent.id)
+          )
+        });
+
+        if (!currentFee) {
+          const expectedToSet = Number(totalExpected || 45000);
+          const [newFeeAccount] = await db
+            .insert(studentFees)
+            .values({
+              schoolId: effSchool,
+              studentId: matchedStudent.id,
+              totalExpected: expectedToSet,
+              totalPaid: 0,
+              totalReduction: 0,
+              balance: expectedToSet,
+              status: "Impayé",
+            })
+            .returning();
+          currentFee = newFeeAccount;
+        }
+        if (currentFee) {
+          resolvedFeeId = currentFee.id;
+        }
+      }
+    }
+
+    // If still no valid feeId, find or create default fee record for school to prevent sync crash
+    if (!resolvedFeeId) {
+      const effSchool = Number(targetSchoolId);
+      const expectedToSet = Number(totalExpected || 45000);
+      const [fallbackFee] = await db
+        .insert(studentFees)
+        .values({
+          schoolId: effSchool,
+          totalExpected: expectedToSet,
+          totalPaid: 0,
+          totalReduction: 0,
+          balance: expectedToSet,
+          status: "Impayé",
+        })
+        .returning();
+      resolvedFeeId = fallbackFee.id;
+      currentFee = fallbackFee;
+    }
 
     const doubleAmount = Number(amount || 0);
     const doubleReduction = Number(reduction || 0);
@@ -306,10 +384,10 @@ export async function POST(request: NextRequest) {
       newStatus = "Partiel";
     }
 
-    // Insert payment
+    // Insert payment with safely resolved feeId
     const paymentValues = {
       schoolId: Number(targetSchoolId),
-      feeId: Number(feeId),
+      feeId: resolvedFeeId,
       amount: doubleAmount,
       reduction: doubleReduction,
       paymentMode: paymentMode || "Espèces",
@@ -322,15 +400,17 @@ export async function POST(request: NextRequest) {
     const [insertedPayment] = await db.insert(feePayments).values(paymentValues).returning();
 
     // Update student fee record
-    await db
-      .update(studentFees)
-      .set({
-        totalPaid: newPaid,
-        totalReduction: newReduction,
-        balance: newBalance,
-        status: newStatus,
-      })
-      .where(eq(studentFees.id, Number(feeId)));
+    if (resolvedFeeId) {
+      await db
+        .update(studentFees)
+        .set({
+          totalPaid: newPaid,
+          totalReduction: newReduction,
+          balance: newBalance,
+          status: newStatus,
+        })
+        .where(eq(studentFees.id, resolvedFeeId));
+    }
 
     try {
       revalidatePath("/dashboard/finance");

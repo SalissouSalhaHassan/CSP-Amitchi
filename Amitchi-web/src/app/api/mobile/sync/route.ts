@@ -347,8 +347,26 @@ export async function POST(request: NextRequest) {
 
             // Also initialize or fetch fee account if fees specified
             let studentFeeAccount: any = null;
-            if (created && (Number(data.fraisInscription || 0) > 0 || Number(data.fraisMensuels || 0) > 0)) {
-              const totalExpected = Number(data.fraisInscription || 0) + Number(data.fraisMensuels || 0) * 9;
+            const regFee = Number(data.fraisInscription || 0);
+            const rawMonthly = Number(data.fraisMensuels || 0);
+            if (created && (regFee > 0 || rawMonthly > 0)) {
+              let totalExpected: number;
+              const isPrimaireOrMater = String(data.educationalLevel || "").toLowerCase().includes("prim") ||
+                String(data.educationalLevel || "").toLowerCase().includes("mater") ||
+                String(data.classe || "").toLowerCase().includes("ce") ||
+                String(data.classe || "").toLowerCase().includes("cm") ||
+                String(data.classe || "").toLowerCase().includes("ci") ||
+                String(data.classe || "").toLowerCase().includes("cp");
+
+              if (rawMonthly >= 30000 || (isPrimaireOrMater && rawMonthly >= 20000)) {
+                // Entered amount is already the full annual tuition
+                totalExpected = regFee + rawMonthly;
+              } else {
+                totalExpected = regFee + (rawMonthly * 9);
+              }
+
+              if (totalExpected <= 0) totalExpected = 45000;
+
               [studentFeeAccount] = await db
                 .insert(studentFees)
                 .values({

@@ -870,7 +870,7 @@ class _StudentFormScreenState extends State<StudentFormScreen> {
           children: [
             Row(
               children: [
-                Expanded(child: _darkTextField(_monthlyController, 'MENSUALITÉ (FCFA) *', hint: '40000', keyboardType: TextInputType.number, required: true)),
+                Expanded(child: _darkTextField(_monthlyController, 'MENSUALITÉ (FCFA) *', hint: '5000', keyboardType: TextInputType.number, required: true)),
                 const SizedBox(width: 12),
                 Expanded(child: _darkTextField(_registrationController, 'INSCRIPTION (FCFA) *', hint: '5000', keyboardType: TextInputType.number, required: true)),
               ],

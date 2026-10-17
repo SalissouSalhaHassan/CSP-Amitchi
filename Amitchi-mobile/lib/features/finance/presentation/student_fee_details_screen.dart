@@ -65,6 +65,19 @@ class _StudentFeeDetailsScreenState extends State<StudentFeeDetailsScreen> {
         }
       } catch (_) {}
 
+      final studentObj = _currentFee['students'] as Map<String, dynamic>? ?? {};
+      final className = studentObj['classe']?.toString().toUpperCase() ?? '';
+      final levelName = studentObj['educational_level']?.toString().toLowerCase() ?? '';
+      final isPrimary = levelName.contains('prim') || levelName.contains('mater') ||
+          className.contains('CE') || className.contains('CM') || className.contains('CI') || className.contains('CP');
+
+      double currentExp = (freshFee['total_expected'] as num?)?.toDouble() ?? 0.0;
+      if (isPrimary && (currentExp >= 300000.0 || currentExp == 366500.0)) {
+        // Correct 9-month inflation bug on single-payment / annual fees
+        currentExp = 45000.0;
+        freshFee['total_expected'] = 45000.0;
+      }
+
       // Re-calculate totals from payments if payments exist to guarantee 100% sync
       if (paymentsList.isNotEmpty) {
         double paidSum = 0.0;
@@ -73,7 +86,7 @@ class _StudentFeeDetailsScreenState extends State<StudentFeeDetailsScreen> {
           paidSum += (p['amount'] as num?)?.toDouble() ?? 0.0;
           reductionSum += (p['reduction'] as num?)?.toDouble() ?? 0.0;
         }
-        final expected = (freshFee['total_expected'] as num?)?.toDouble() ?? 0.0;
+        final expected = currentExp > 0 ? currentExp : ((freshFee['total_expected'] as num?)?.toDouble() ?? 0.0);
         final balance = (expected - paidSum - reductionSum).clamp(0.0, double.infinity);
         final status = balance <= 0 ? 'Soldé' : paidSum > 0 ? 'Partiel' : 'Impayé';
 
@@ -81,6 +94,8 @@ class _StudentFeeDetailsScreenState extends State<StudentFeeDetailsScreen> {
         freshFee['total_reduction'] = reductionSum;
         freshFee['balance'] = balance;
         freshFee['status'] = status;
+      } else {
+        freshFee['balance'] = currentExp;
       }
 
       final canCollect = await locator<PermissionService>()

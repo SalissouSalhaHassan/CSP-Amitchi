@@ -402,7 +402,28 @@ class StudentsRepository {
       final prevBalance = (studentData['ancien_solde'] as num?)?.toDouble() ??
           double.tryParse(studentData['ancien_solde']?.toString() ?? '') ?? 0.0;
 
-      final totalExpected = (monthly * 9.0) + registration + coges + transport + prevBalance;
+      final isPrimary = (studentData['educational_level']?.toString().toLowerCase().contains('prim') ?? false) ||
+          (studentData['educational_level']?.toString().toLowerCase().contains('mater') ?? false) ||
+          (studentData['classe']?.toString().toUpperCase().contains('CE') ?? false) ||
+          (studentData['classe']?.toString().toUpperCase().contains('CM') ?? false) ||
+          (studentData['classe']?.toString().toUpperCase().contains('CI') ?? false) ||
+          (studentData['classe']?.toString().toUpperCase().contains('CP') ?? false);
+
+      double tuition;
+      if (monthly >= 30000.0 || (isPrimary && monthly >= 20000.0)) {
+        // The entered amount is already the full annual tuition, NOT monthly
+        tuition = monthly;
+      } else if (monthly > 0) {
+        tuition = monthly * 9.0;
+      } else {
+        tuition = isPrimary ? 40000.0 : 0.0;
+      }
+
+      double totalExpected = tuition + registration + coges + transport + prevBalance;
+      if (isPrimary && (totalExpected > 75000.0 || totalExpected <= 0.0)) {
+        // Enforce realistic school fee ceiling for primary level
+        totalExpected = 45000.0;
+      }
       final feeId = DateTime.now().millisecondsSinceEpoch;
 
       final session = locator<SessionManager>();

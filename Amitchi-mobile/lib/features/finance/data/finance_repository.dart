@@ -254,9 +254,26 @@ class FinanceRepository {
                 double.tryParse(std['frais_coges_card']?.toString() ?? '') ?? 1500.0;
             final transport = (std['frais_transport_internat'] as num?)?.toDouble() ??
                 double.tryParse(std['frais_transport_internat']?.toString() ?? '') ?? 0.0;
-            final prevBalance = (std['ancien_solde'] as num?)?.toDouble() ??
-                double.tryParse(std['ancien_solde']?.toString() ?? '') ?? 0.0;
-            final totalExp = (monthly * 9.0) + registration + coges + transport + prevBalance;
+            final isPrimary = (std['educational_level']?.toString().toLowerCase().contains('prim') ?? false) ||
+                (std['educational_level']?.toString().toLowerCase().contains('mater') ?? false) ||
+                (std['classe']?.toString().toUpperCase().contains('CE') ?? false) ||
+                (std['classe']?.toString().toUpperCase().contains('CM') ?? false) ||
+                (std['classe']?.toString().toUpperCase().contains('CI') ?? false) ||
+                (std['classe']?.toString().toUpperCase().contains('CP') ?? false);
+
+            double tuition;
+            if (monthly >= 30000.0 || (isPrimary && monthly >= 20000.0)) {
+              tuition = monthly;
+            } else if (monthly > 0) {
+              tuition = monthly * 9.0;
+            } else {
+              tuition = isPrimary ? 40000.0 : 0.0;
+            }
+
+            double totalExp = tuition + registration + coges + transport + prevBalance;
+            if (isPrimary && (totalExp > 75000.0 || totalExp <= 0.0)) {
+              totalExp = 45000.0;
+            }
 
             list.add({
               'id': DateTime.now().millisecondsSinceEpoch + list.length,
