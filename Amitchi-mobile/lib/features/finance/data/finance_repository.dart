@@ -270,6 +270,9 @@ class FinanceRepository {
               tuition = isPrimary ? 40000.0 : 0.0;
             }
 
+            final prevBalance = (std['ancien_solde'] as num?)?.toDouble() ??
+                double.tryParse(std['ancien_solde']?.toString() ?? '') ?? 0.0;
+
             double totalExp = tuition + registration + coges + transport + prevBalance;
             if (isPrimary && (totalExp > 75000.0 || totalExp <= 0.0)) {
               totalExp = 45000.0;
