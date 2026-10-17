@@ -7,6 +7,7 @@ import '../../../core/api/offline_store_manager.dart';
 import '../../../core/api/supabase_client.dart';
 import '../../../core/api/mobile_api_client.dart';
 import '../../../core/api/sync_engine.dart';
+import '../../../core/auth/session_manager.dart';
 import '../../../core/di/injection.dart';
 import '../../../core/utils/educational_level_helper.dart';
 
